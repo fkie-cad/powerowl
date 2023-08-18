@@ -1,0 +1,2 @@
+class UndefinedNetworkError(Exception):
+    pass

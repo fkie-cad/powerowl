@@ -1,0 +1,2 @@
+class ModelNodeNotFoundException(Exception):
+    pass

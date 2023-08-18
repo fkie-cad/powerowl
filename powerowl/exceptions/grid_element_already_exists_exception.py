@@ -1,0 +1,2 @@
+class GridElementAlreadyExistsException(Exception):
+    pass

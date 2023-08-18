@@ -1,0 +1,2 @@
+class GraphDecodingError(Exception):
+    pass

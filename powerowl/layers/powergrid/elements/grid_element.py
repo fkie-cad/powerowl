@@ -1,0 +1,261 @@
+import abc
+import enum
+from typing import List, Type, TYPE_CHECKING, Tuple, Optional, Union
+
+from powerowl.exceptions.grid_value_error import GridValueError
+from powerowl.layers.powergrid.elements.attribute_specification import AttributeSpecification
+from powerowl.layers.powergrid.values.grid_value import GridValue
+from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
+from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
+
+if TYPE_CHECKING:
+    from powerowl.layers.powergrid.power_grid_model import PowerGridModel
+
+
+class GridElement(abc.ABC):
+    prefix: str = "grid-element"
+    indices = {}
+
+    @classmethod
+    def next_index(cls):
+        cls_str = str(cls.__name__)
+        index = GridElement.indices.get(cls_str, -1)
+        index += 1
+        GridElement.indices[cls_str] = index
+        return index
+
+    def __init__(self, create_specification: bool = True, sanitize_specification: bool = False, **kwargs):
+        self.index = self.next_index() if "index" not in kwargs else kwargs.pop("index")
+        self._attributes = {
+            GridValueContext.PROPERTY: {},
+            GridValueContext.CONFIGURATION: {},
+            GridValueContext.MEASUREMENT: {},
+            GridValueContext.ESTIMATION: {},
+            GridValueContext.GENERIC: {},
+        }
+        if not create_specification:
+            return
+        specifications = self.get_specifications()
+        while len(specifications) > 0:
+            spec = specifications.pop()
+            value = GridValue.from_specification(spec, self)
+            if spec.name in kwargs:
+                val = kwargs[spec.name]
+                if isinstance(val, GridValue):
+                    val = val.raw_get_value()
+                value.raw_set_value(val)
+            if spec.required and value.value is None and sanitize_specification:
+                raise GridValueError(f"Required value {spec.name} missing for {self.get_identifier()}")
+            self._attributes[spec.context][spec.name] = value
+            if spec.context == GridValueContext.MEASUREMENT:
+                spec_est = spec.copy()
+                spec_est.context = GridValueContext.ESTIMATION
+                specifications.append(spec_est)
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_specifications() -> List[AttributeSpecification]:
+        ...
+
+    def get_grid_values(self, context: Optional[Union[GridValueContext, List[GridValueContext]]] = None) -> List[Tuple[str, GridValue]]:
+        results = []
+        if context is not None:
+            if isinstance(context, list):
+                contexts = context
+            else:
+                contexts = [context]
+        else:
+            contexts = [GridValueContext.GENERIC, GridValueContext.PROPERTY, GridValueContext.CONFIGURATION,
+                        GridValueContext.MEASUREMENT, GridValueContext.ESTIMATION]
+        for context in contexts:
+            for attribute_name, attribute in self._attributes[context].items():
+                results.append((attribute_name, attribute))
+        return results
+
+    def get(self, key, context: GridValueContext) -> GridValue:
+        if key in self._attributes[context]:
+            return self._attributes[context][key]
+        raise KeyError(f"This element has no {context.value} '{key}'")
+
+    def set(self, key, context: GridValueContext, value: GridValue) -> GridValue:
+        self._attributes[context][key] = value
+        return value
+
+    def has(self, key, context: GridValueContext) -> bool:
+        try:
+            self.get(key, context)
+            return True
+        except KeyError:
+            return False
+
+    def get_generic(self, key) -> GridValue:
+        return self.get(key, GridValueContext.GENERIC)
+
+    def get_property(self, key) -> GridValue:
+        return self.get(key, GridValueContext.PROPERTY)
+
+    def get_config(self, key) -> GridValue:
+        return self.get(key, GridValueContext.CONFIGURATION)
+
+    def get_measurement(self, key) -> GridValue:
+        return self.get(key, GridValueContext.MEASUREMENT)
+
+    def get_estimation(self, key) -> GridValue:
+        return self.get(key, GridValueContext.ESTIMATION)
+
+    def get_generic_value(self, key):
+        return self.get_generic(key).value
+
+    def get_property_value(self, key):
+        return self.get_property(key).value
+
+    def get_config_value(self, key):
+        return self.get_config(key).value
+
+    def get_measurement_value(self, key):
+        return self.get_measurement(key).value
+
+    def get_estimation_value(self, key):
+        return self.get_estimation(key).value
+
+    def get_name(self):
+        return self.get_generic_value("name")
+
+    def to_dict(self) -> dict:
+        return {
+            "type": self.prefix,
+            "index": self.index,
+            "attributes": self._attributes
+        }
+
+    def to_primitive_dict(self) -> dict:
+        d = self.to_dict()
+        attributes = d["attributes"]
+        primitive_attributes = {}
+        for attribute_type, attributes_of_type in attributes.items():
+            primitive_attributes[attribute_type.name] = {}
+            for attribute_name, attribute_value in attributes_of_type.items():
+                attribute_value: GridValue
+                value = attribute_value.value
+                if isinstance(value, enum.Enum):
+                    value = value.name
+                if isinstance(value, GridElement):
+                    value = value.get_identifier()
+                primitive_attributes[attribute_type.name][attribute_name] = value
+        d["attributes"] = primitive_attributes
+        return d
+
+    def from_primitive_dict(self, primitive_dict: dict, power_grid: 'PowerGridModel'):
+        """
+        Loads this grid element instance based on the given primitive dict and the set of other grid elements
+        """
+        for spec in self.get_specifications():
+            self._attributes[spec.context][spec.name] = GridValue.from_specification(spec, self)
+        # Restore values
+        for attribute_type, attributes in primitive_dict["attributes"].items():
+            context = GridValueContext[attribute_type]
+            for attribute_name, attribute_value in attributes.items():
+                value = self.get(attribute_name, context)
+                try:
+                    if issubclass(value.value_type, GridElement):
+                        # Reference to another grid element
+                        element_type, element_id = attribute_value.split(".")
+                        element = power_grid.get_element(element_type, int(element_id))
+                        value.set_value(element)
+                    elif issubclass(value.value_type, enum.Enum):
+                        value.set_value(value.value_type[attribute_value])
+                    else:
+                        value.set_value(attribute_value)
+                except TypeError:
+                    # issubclass cannot handle typing classes
+                    value.set_value(attribute_value)
+
+    def from_dict(self, d: dict):
+        self.index = d["index"]
+        self._attributes = d["attributes"]
+
+    def __eq__(self, other):
+        if isinstance(other, GridElement):
+            return other.get_identifier() == self.get_identifier()
+        return False
+
+    def __hash__(self):
+        return id(self)
+
+    def get_index(self) -> str:
+        return self.index
+
+    def get_identifier(self):
+        return f"{self.prefix}.{self.index}"
+
+    def get_elements_in_attributes(self) -> List['GridElement']:
+        """
+        Returns a list of GridElements that are referenced by this element's attributes.
+        """
+        elements = []
+        grid_value: GridValue
+        for _, grid_value in self.get_grid_values():
+            if isinstance(grid_value.value, GridElement):
+                elements.append(grid_value.value)
+        return elements
+
+    def is_controllable(self) -> bool:
+        try:
+            controllable = self.get_property("controllable").value
+            return controllable
+        except KeyError:
+            return False
+
+    def is_observable(self) -> bool:
+        try:
+            observable = self.get("observable", GridValueContext.GENERIC).value
+            return observable
+        except KeyError:
+            return False
+
+    def get_providers(self, filtered: bool = False) -> List[PowerGridProviderInfo]:
+        providers = []
+
+        specifications = self.get_specifications()
+        for spec in specifications:
+            # Include all present attributes of supported types
+            if spec.context not in [GridValueContext.MEASUREMENT, GridValueContext.CONFIGURATION]:
+                # Skip static parameters
+                continue
+            if spec.value_type not in [bool, int, float]:
+                # Skip unsupported types
+                continue
+            if not spec.required and spec.default_value is None:
+                # Skip empty & non-required attributes
+                continue
+            provider = PowerGridProviderInfo()
+            if spec.context == GridValueContext.MEASUREMENT:
+                if filtered and not self.is_observable():
+                    # Skip monitoring attributes when element is not observable and filtering is enabled
+                    continue
+                provider.domain = "source"
+            elif spec.context == GridValueContext.CONFIGURATION:
+                if filtered and not self.is_controllable():
+                    # Skip control attributes when element is not controllable and filtering is enabled
+                    continue
+                provider.domain = "target"
+            # Build Power Grid Provider current attribute
+            provider.element_id = self.get_identifier()
+            provider.attribute_context = spec.context
+            provider.attribute_name = spec.name
+            provider.attribute_type = spec.value_type
+            providers.append(provider)
+
+        return providers
+
+    @staticmethod
+    def element_class_by_type(element_type: str) -> Type['GridElement']:
+        from powerowl.layers.powergrid.elements import (Bus, DcLine, ExtendedWard, ExternalGrid, Generator,
+                                                        Impedance, Line, Load, Motor, Shunt, StaticGenerator, Storage,
+                                                        Switch, Transformer, Ward)
+        candidates = [Bus, DcLine, ExtendedWard, ExternalGrid, Generator, Impedance, Line, Load, Motor, Shunt,
+                      StaticGenerator, Storage, Switch, Transformer, Ward]
+        for grid_element_class in candidates:
+            if grid_element_class.prefix == element_type:
+                return grid_element_class
+        raise KeyError(f"No grid element class for type {element_type} found")

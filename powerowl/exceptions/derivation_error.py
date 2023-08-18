@@ -1,0 +1,2 @@
+class DerivationError(Exception):
+    pass

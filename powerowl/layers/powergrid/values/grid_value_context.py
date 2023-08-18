@@ -1,0 +1,9 @@
+import enum
+
+
+class GridValueContext(str, enum.Enum):
+    GENERIC = "GENERIC"
+    PROPERTY = "PROPERTY"
+    CONFIGURATION = "CONFIGURATION"
+    MEASUREMENT = "MEASUREMENT"
+    ESTIMATION = "ESTIMATION"
