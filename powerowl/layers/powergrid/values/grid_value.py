@@ -163,9 +163,12 @@ class GridValue:
             value = self._scale.from_scale(value, value_scale)
         self._last_updated = timestamp
         changed = False
-        if self._value != value:
+        try:
+            if self._value != value:
+                changed = True
+                self._last_changed = timestamp
+        except ValueError:
             changed = True
-            self._last_changed = timestamp
         self._value = value
         return changed
 
