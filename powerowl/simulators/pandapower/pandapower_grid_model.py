@@ -5,26 +5,24 @@ import time
 import warnings
 from typing import Any, Dict, Type, Tuple, Optional
 
-import numpy as np
 import pandapower as pp
 import pandas as pd
-from pandas import DataFrame
 
-from ...layers.powergrid.elements import *
-from ...layers.powergrid.elements.enums.bus_type import BusType
-from ...layers.powergrid.elements.enums.connection_type import ConnectionType
-from ...layers.powergrid.elements.enums.line_type import LineType
-from ...layers.powergrid.elements.enums.static_generator_type import StaticGeneratorType
-from ...layers.powergrid.elements.enums.switch_type import SwitchType
-from ...layers.powergrid.elements.enums.tap_side import TapSide
-from ...layers.powergrid.elements.enums.vector_group import VectorGroup
-from ...layers.powergrid.power_grid_model import PowerGridModel
-from ...layers.powergrid.power_grid_model_builder import PowerGridModelBuilder
-from ...layers.powergrid.values.grid_value import GridValue
-from ...layers.powergrid.values.grid_value_context import GridValueContext
-from ...layers.powergrid.values.units.scale import Scale
-from ...layers.powergrid.values.units.unit import Unit
-from ...exceptions import ConversionError
+from powerowl.layers.powergrid.elements import *
+from powerowl.layers.powergrid.elements.enums.bus_type import BusType
+from powerowl.layers.powergrid.elements.enums.connection_type import ConnectionType
+from powerowl.layers.powergrid.elements.enums.line_type import LineType
+from powerowl.layers.powergrid.elements.enums.static_generator_type import StaticGeneratorType
+from powerowl.layers.powergrid.elements.enums.switch_type import SwitchType
+from powerowl.layers.powergrid.elements.enums.tap_side import TapSide
+from powerowl.layers.powergrid.elements.enums.vector_group import VectorGroup
+from powerowl.layers.powergrid.power_grid_model import PowerGridModel
+from powerowl.layers.powergrid.power_grid_model_builder import PowerGridModelBuilder
+from powerowl.layers.powergrid.values.grid_value import GridValue
+from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
+from powerowl.layers.powergrid.values.units.scale import Scale
+from powerowl.layers.powergrid.values.units.unit import Unit
+from powerowl.exceptions import ConversionError
 
 
 class PandaPowerGridModel(PowerGridModel):
@@ -364,6 +362,12 @@ class PandaPowerGridModel(PowerGridModel):
             if value_scale != Scale.NONE:
                 unit, scale = PandaPowerGridModel.extract_unit_and_scale(column=column)
                 v = value_scale.to_scale(v, scale)
+        if isinstance(element, Line) and column == "std_type":
+            # When we create the line from parameters, we cannot set std_type (for some pandapower reason - introduced with 2.13.X)
+            return
+        if isinstance(element, Transformer) and column == "vector_group":
+            # Another pandapower breaking change - vector_group...
+            return
         attributes[column] = v
         # Potentially handle associated attributes
         PandaPowerGridModel._handle_associated_attributes(element, attribute_name, attribute, net, attributes)

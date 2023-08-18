@@ -142,13 +142,13 @@ class PowerOwl:
             except DerivationError as e:
                 raise e
 
-    def derive_ous(self, derivator_classes: Optional[List[Type[Derivator]]] = None):
+    def derive_ous(self, derivator_classes: Optional[List[Type['Derivator']]] = None):
         if derivator_classes is None:
             from powerowl.derivators.ou.default_ou_derivator import DefaultOUDerivator
             derivator_classes = [DefaultOUDerivator]
         self._multi_derive(derivator_classes)
 
-    def derive_network(self, derivator_classes: Optional[List[Type[Derivator]]] = None):
+    def derive_network(self, derivator_classes: Optional[List[Type['Derivator']]] = None):
         if derivator_classes is None:
             from powerowl.derivators.network.default_network_derivator import DefaultNetworkDerivator
             derivator_classes = [DefaultNetworkDerivator]

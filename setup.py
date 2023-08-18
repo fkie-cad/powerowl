@@ -25,13 +25,14 @@ setup(
         'netifaces==0.11.0',
         'networkx>=2.5',
         'numpy',
-        'pandapower==2.10.1',
-        'pandas==1.3.4',
+        #'pandapower==2.13.2', # Not yet released but contains critical bug fix
+        'pandapower @ git+https://github.com/e2nIEE/pandapower.git',
+        'pandas',
         'pydot',
         'plotly',
         'igraph==0.9.9',
-        'pyyaml==5.3.1',
-        'setuptools==52.0.0',
+        'pyyaml',
+        'setuptools',
         'shapely',
         'ifcfg'
     ],
