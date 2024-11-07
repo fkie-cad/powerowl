@@ -25,8 +25,7 @@ setup(
         'netifaces==0.11.0',
         'networkx>=2.5',
         'numpy',
-        #'pandapower==2.13.2', # Not yet released but contains critical bug fix
-        'pandapower @ git+https://github.com/e2nIEE/pandapower.git',
+        'pandapower==2.14.1',
         'pandas',
         'pydot',
         'plotly',
