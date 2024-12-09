@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Set, Optional, TYPE_CHECKING
 
 import numpy as np
 
@@ -8,8 +8,13 @@ from .enums.vector_group import VectorGroup
 from .grid_edge import GridEdge
 from .grid_node import GridNode
 from ..values.grid_value_context import GridValueContext as Gvc
+from ..values.grid_value_type import Step
 from ..values.units.scale import Scale
 from ..values.units.unit import Unit
+from ...network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
+
+if TYPE_CHECKING:
+    from powerowl.layers.powergrid.elements.bus import Bus
 
 
 class Transformer(GridEdge):
@@ -59,9 +64,10 @@ class Transformer(GridEdge):
             As("maximum_load", Gvc.PROPERTY, float, np.NAN, unit=Unit.PERCENT,
                required=False, pp_column="max_loading_percent"),
 
-            As("tap_position", Gvc.CONFIGURATION, int, np.NAN, pp_column="tap_pos"),
-            As("in_service", Gvc.CONFIGURATION, bool, True),
+            As("tap_position", Gvc.CONFIGURATION, Step, 0, related=[(Gvc.MEASUREMENT, "tap_position")], targets=[(Gvc.MEASUREMENT, "tap_position")]),
+            As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
+            As("tap_position", Gvc.MEASUREMENT, Step, 0, related=[(Gvc.CONFIGURATION, "tap_position")]),
             As("active_power_hv", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
             As("reactive_power_hv", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE),
             As("active_power_lv", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
@@ -94,3 +100,18 @@ class Transformer(GridEdge):
 
     def get_to_bus(self):
         return self.get_lv_bus()
+
+    def has_tap(self) -> bool:
+        return not np.isnan(self.get_property_value("tap_neutral"))
+
+    def get_providers(self, filtered: bool = False, busses: Optional[Set['Bus']] = None) -> List[PowerGridProviderInfo]:
+        providers = super().get_providers(filtered=filtered, busses=busses)
+        if self.has_tap():
+            return providers
+        transformer_providers = []
+
+        for provider in providers:
+            if provider.attribute_name == "tap_position" and provider.attribute_context == Gvc.CONFIGURATION:
+                continue
+            transformer_providers.append(provider)
+        return transformer_providers

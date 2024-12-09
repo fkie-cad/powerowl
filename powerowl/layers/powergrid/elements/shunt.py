@@ -24,11 +24,11 @@ class Shunt(GridAsset):
 
             As("bus", Gvc.PROPERTY, GridNode, None),
             As("rated_voltage", Gvc.PROPERTY, float, np.NAN, Unit.VOLT, Scale.BASE),
-            As("active_power", Gvc.PROPERTY, float, np.NAN, Unit.WATT, Scale.BASE),
-            As("reactive_power", Gvc.PROPERTY, float, np.NAN, Unit.VAR, Scale.BASE),
+            As("active_power_fix_point", Gvc.PROPERTY, float, np.NAN, Unit.WATT, Scale.BASE),
+            As("reactive_power_fix_point", Gvc.PROPERTY, float, np.NAN, Unit.VAR, Scale.BASE),
 
             As("step", Gvc.CONFIGURATION, int, 1),
-            As("in_service", Gvc.CONFIGURATION, bool, True),
+            As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
             As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
             As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE),

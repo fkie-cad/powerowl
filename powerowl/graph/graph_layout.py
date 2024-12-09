@@ -73,6 +73,12 @@ class GraphLayout:
                             continue
                         # Get position of nearest positioned node
                         for edge in nx.algorithms.traversal.bfs_edges(graph, n):
+                            if "8616" in edge:
+                                print(n)
+                                print(model_node.__class__.__name__)
+                                print(model_node.name)
+                                print(model_node.uid)
+                                print(edge)
                             pos = self.mlg.get_model_node(edge[1]).get_position_2d(create_default_position=False)
                             if pos is not None:
                                 pos2d[n] = pos

@@ -27,12 +27,12 @@ class Ward(GridAsset):
             As("impedance_active_power_demand", Gvc.PROPERTY, float, np.NAN, Unit.WATT, Scale.BASE, pp_column="pz_mw"),
             As("impedance_reactive_power_demand", Gvc.PROPERTY, float, np.NAN, Unit.VAR, Scale.BASE,
                pp_column="qz_mvar"),
-            As("active_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, pp_column="qs_mvar"),
-            As("reactive_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, pp_column="ps_mw"),
+            As("active_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, pp_column="qs_mvar", related=[(Gvc.MEASUREMENT, "reactive_power")]),
+            As("reactive_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, pp_column="ps_mw", related=[(Gvc.MEASUREMENT, "active_power")]),
 
-            As("in_service", Gvc.CONFIGURATION, bool, True, pp_column="in_service"),
+            As("in_service", Gvc.CONFIGURATION, bool, True, pp_column="in_service", operator_controllable=False),
 
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, pp_column="p_mw"),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, pp_column="q_mvar"),
+            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, pp_column="p_mw", related=[(Gvc.CONFIGURATION, "active_power_demand")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, pp_column="q_mvar", related=[(Gvc.CONFIGURATION, "reactive_power_demand")]),
             As("voltage", Gvc.MEASUREMENT, float, np.NAN, Unit.PER_UNIT, pp_column="vm_pu")
         ]

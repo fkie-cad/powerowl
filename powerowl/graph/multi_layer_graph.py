@@ -154,17 +154,23 @@ class MultiLayerGraph:
             return f"{name.__class__.__name__}.{name.value}"
         return name
 
-    def get_node_uid(self, node: Union[str, enum.Enum, ModelNode]) -> str:
+    def get_node_uid(self, node: Union[int, str, enum.Enum, ModelNode]) -> str:
         if isinstance(node, ModelNode):
             return node.uid
+        """
+        if isinstance(node, (int, str)) and str(node) in self.graph.nodes:
+            return f"{node}"
+        """
         node = self.get_node_name(node)
         if node in self.graph.nodes:
             return node
+        if str(node) in self.graph.nodes:
+            return str(node)
         for node_uid in self.graph.nodes.keys():
             node_model = self.get_model_node(node_uid)
             if node_model.name == node:
                 return node_model.uid
-        raise KeyError(f"No node with ID or name {node} exists")
+        raise KeyError(f"No node with ID or name {node} ({type(node)}) exists")
 
     def add_node(self, model_node: 'ModelNode'):
         with self._rlock:
@@ -173,6 +179,34 @@ class MultiLayerGraph:
                 raise AttributeError("ModelNode layer must not be None")
             self.graph.add_nodes_from([(name, {MODEL_NODE: model_node})])
             return model_node
+
+    def extract_node(self, model_node: 'ModelNode'):
+        """
+        Extracts a node from the MLG, i.e., the node is removed and all intra-layer edges are joint.
+        """
+        with self._rlock:
+            neighbors = self.get_intra_layer_neighbors(model_node)
+            edge_types = {}
+            for neighbor in neighbors:
+                edge = self.get_edge(model_node, neighbor)
+                edge_types[neighbor.id] = edge.edge_type
+                self.remove_edge(edge)
+            self.remove_node(model_node)
+            for i, neighbor_a in enumerate(neighbors):
+                for neighbor_b in neighbors[i+1:]:
+                    edge_type_a = edge_types[neighbor_a.id]
+                    edge_type_b = edge_types[neighbor_b.id]
+                    if edge_type_a != edge_type_b:
+                        warnings.warn(f"Mismatch for edge_types between {neighbor_a.id} ({edge_type_a}) and {neighbor_b.id} ({edge_type_b})")
+                    self.build_edge(neighbor_a, neighbor_b, edge_type_a)
+
+    def relabel_nodes(self, relabeling_dict: dict):
+        uid_map = {}
+        for uid, new_id in relabeling_dict.items():
+            node = self.get_model_node(uid)
+            node.set_id(new_id)
+            uid_map[uid] = node.uid
+        self.graph = nx.relabel_nodes(self.graph, uid_map, copy=True)
 
     def add_edge(self, model_edge: 'ModelEdge'):
         with self._rlock:
@@ -398,6 +432,16 @@ class MultiLayerGraph:
         n = self.get_node_uid(n)
         self.graph.nodes[n][MODEL_NODE] = model_node
 
+    def replace_model_node(self, original_model_node: ModelNode, new_model_node: ModelNode):
+        n = self.get_node_uid(original_model_node)
+        self.set_model_node(n, new_model_node)
+        # Replace in edges
+        for edge in self.get_edges_by_node(original_model_node):
+            if edge.node_a == original_model_node:
+                edge.node_a = new_model_node
+            if edge.node_b == original_model_node:
+                edge.node_b = new_model_node
+
     def has_node(self, n: Union[str, ModelNode]) -> bool:
         uid = self.get_node_uid(n)
         return self.graph.has_node(uid)
@@ -458,6 +502,7 @@ class MultiLayerGraph:
                 raise ValueError(f"Invalid edge: {edge}. ModelEdge instance is None")
             model_node_a = self.get_model_node(name_a)
             model_node_b = self.get_model_node(name_b)
+
             matches = 0
             for model_node in [model_node_a, model_node_b]:
                 for layer in layers:
@@ -478,11 +523,22 @@ class MultiLayerGraph:
             edges.add(model_edge)
         return sorted(edges)
 
+    def get_edges_by_node(self, node: ModelNode):
+        return [edge for edge in self.get_edges() if edge.node_a == node or edge.node_b == node]
+
     def get_nodes(self) -> List[ModelNode]:
         nodes = set()
         for node_id in self.graph.nodes.keys():
             nodes.add(self.get_model_node(node_id))
         return sorted(nodes)
+
+    def get_node(self, node_id: str) -> ModelNode:
+        if node_id in self.graph.nodes:
+            return self.graph.nodes[node_id]
+        raise KeyError(f"Invalid node: {node_id}. ModelNode")
+
+    def get_nodes_by_class(self, cls: Type[ModelNode]) -> List[ModelNode]:
+        return [node for node in self.get_nodes() if node.__class__ == cls]
 
     def remove_node(self, node: Union[str, ModelNode]):
         with self._rlock:
@@ -501,6 +557,7 @@ class MultiLayerGraph:
             max_depth: Optional[int] = None,
             stop_node_types: Optional[Set[Type['ModelNode']]] = None,
             allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
+            node_filter: Optional[Callable[[ModelNode], bool]] = None,
             stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
             allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
             layers: Optional[Set['GraphLayer']] = None,
@@ -522,6 +579,7 @@ class MultiLayerGraph:
             max_depth=max_depth,
             stop_node_types=stop_node_types,
             allowed_node_types=allowed_node_types,
+            node_filter=node_filter,
             stop_edge_types=stop_edge_types,
             allowed_edge_types=allowed_edge_types,
             layers=layers,
@@ -533,6 +591,7 @@ class MultiLayerGraph:
             max_depth: Optional[int] = None,
             stop_node_types: Optional[Set[Type['ModelNode']]] = None,
             allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
+            node_filter: Optional[Callable[[ModelNode], bool]] = None,
             stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
             allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
             layers: Optional[Set['GraphLayer']] = None,
@@ -551,6 +610,7 @@ class MultiLayerGraph:
             max_depth=max_depth,
             stop_node_types=stop_node_types,
             allowed_node_types=allowed_node_types,
+            node_filter=node_filter,
             stop_edge_types=stop_edge_types,
             allowed_edge_types=allowed_edge_types,
             layers=layers,
@@ -563,6 +623,7 @@ class MultiLayerGraph:
                       max_depth: Optional[int] = None,
                       stop_node_types: Optional[Set[Type['ModelNode']]] = None,
                       allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
+                      node_filter: Optional[Callable[[ModelNode], bool]] = None,
                       stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
                       allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
                       layers: Optional[Set['GraphLayer']] = None,
@@ -602,6 +663,11 @@ class MultiLayerGraph:
                 successors = [
                     successor for successor in successors
                     if isinstance(successor, tuple(allowed_node_types))
+                ]
+            if node_filter is not None:
+                successors = [
+                    successor for successor in successors
+                    if node_filter(successor)
                 ]
             if stop_edge_types is not None:
                 # Exclude all nodes connected to by not-allowed edge types

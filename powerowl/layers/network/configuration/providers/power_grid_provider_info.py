@@ -1,8 +1,12 @@
-from typing import Optional, Type, Any
+from typing import Optional, Type, Any, TYPE_CHECKING
 
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
 from powerowl.layers.network.configuration.providers.provider_name import ProviderName
 from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
+
+if TYPE_CHECKING:
+    from powerowl.layers.powergrid.values.grid_value import GridValue
+    from powerowl.layers.powergrid import PowerGridModel
 
 
 class PowerGridProviderInfo(ProviderInfo):
@@ -35,3 +39,6 @@ class PowerGridProviderInfo(ProviderInfo):
         self.attribute_context = d["context"]
         self.attribute_name = d["attribute"]
         self.attribute_type = d["type"]
+
+    def get_grid_value(self, grid_model: 'PowerGridModel') -> 'GridValue':
+        return grid_model.get_element_by_identifier(self.element_id).get(self.attribute_name, self.attribute_context)

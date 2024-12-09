@@ -30,7 +30,7 @@ class Impedance(GridEdge):
             As("reactance_to_from", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
             As("apparent_power", Gvc.PROPERTY, float, np.NAN, Unit.VOLT_AMPERE, Scale.BASE),
 
-            As("in_service", Gvc.CONFIGURATION, bool, True),
+            As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
             As("active_power_from", Gvc.MEASUREMENT, float, None, Unit.WATT, Scale.BASE, required=False),
             As("reactive_power_from", Gvc.MEASUREMENT, float, None, Unit.VAR, Scale.BASE, required=False),

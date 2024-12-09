@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Union
+from typing import Union, List
 
 from .bus import Bus
 from .grid_edge import GridEdge
@@ -18,3 +18,8 @@ class GridAnnotator(GridElement, ABC):
 
     def get_associated(self) -> Union['GridNode', 'GridEdge']:
         return self.get_property_value("element")
+
+    def get_buses(self) -> List['Bus']:
+        if isinstance(self.get_associated(), Bus):
+            return [self.get_bus(), self.get_associated()]
+        return [self.get_bus()]

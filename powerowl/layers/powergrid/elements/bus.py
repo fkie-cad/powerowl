@@ -4,6 +4,7 @@ import numpy as np
 
 from .attribute_specification import AttributeSpecification as As
 from .enums.bus_type import BusType
+from .enums.voltage_niveau import VoltageNiveau
 from .grid_node import GridNode
 from ..values.grid_value_context import GridValueContext as Gvc
 from ..values.units.scale import Scale
@@ -16,12 +17,16 @@ class Bus(GridNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    def get_buses(self) -> List['Bus']:
+        return [self]
+
     @staticmethod
     def get_specifications() -> List[As]:
         return [
             As("name", Gvc.GENERIC, str, None, required=False),
             As("observable", Gvc.GENERIC, bool, True, required=False),
 
+            As("controllable", Gvc.PROPERTY, bool, True, required=False),
             As("voltage_niveau", Gvc.PROPERTY, float, 0, Unit.VOLT, Scale.BASE),
             As("position", Gvc.PROPERTY, Tuple, None, required=False, pp_column="coords"),
             As("geo_position", Gvc.PROPERTY, Tuple[float, float], None, required=False, pp_column="geodata"),
@@ -30,10 +35,13 @@ class Bus(GridNode):
             As("minimum_voltage", Gvc.PROPERTY, float, 0.9, Unit.PER_UNIT, required=False),
             As("maximum_voltage", Gvc.PROPERTY, float, 1.1, Unit.PER_UNIT, required=False),
 
-            As("in_service", Gvc.CONFIGURATION, bool, True, required=True),
+            As("in_service", Gvc.CONFIGURATION, bool, True, required=True, operator_controllable=False),
 
             As("voltage", Gvc.MEASUREMENT, float, np.NAN, Unit.PER_UNIT),
             As("voltage_angle", Gvc.MEASUREMENT, float, 0, Unit.DEGREE, Scale.BASE),
             As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
             As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE)
         ]
+
+    def get_voltage_niveau(self) -> VoltageNiveau:
+        return VoltageNiveau.by_value(self.get_property_value("voltage_niveau"))

@@ -6,3 +6,4 @@ class ProviderName(enum.Enum):
     PANDAPOWER = "pandapower"
     MODBUS = "modbus"
     REGISTER = "register"
+    PROTECTION = "protection"

@@ -3,7 +3,7 @@ import enum
 import sys
 import types
 import warnings
-from typing import TYPE_CHECKING, Optional, Any, Union, Tuple, List
+from typing import TYPE_CHECKING, Optional, Any, Union, Tuple, List, Callable
 
 from powerowl.graph.constants import FACILITY, OU
 from powerowl.graph.enums import EdgeType
@@ -25,12 +25,26 @@ class ModelNode:
 
     def __post_init__(self):
         from powerowl.power_owl import PowerOwl
-        self.id: int = PowerOwl.next_global_id()
+        self.id: int = PowerOwl.next_global_id(self)
+        self.typed_id: int = PowerOwl.next_typed_id(self.__class__)
+        self._auto_name: bool = False
         self._attributes = {}
         if self.name is None:
+            self._auto_name = True
             self.name = f"{self.__class__.__name__}.{self.id}"
         elif isinstance(self.name, enum.Enum):
             self.name = f"{self.name.__class__.__name__}.{self.name.value}"
+        self._on_set_id_callbacks: List[Callable[['ModelNode'], None]] = []
+
+    def set_id(self, id: int):
+        self.id = id
+        if self._auto_name:
+            self.name = f"{self.__class__.__name__}.{self.id}"
+        for on_set_id in self._on_set_id_callbacks:
+            on_set_id(self)
+
+    def add_on_set_id_callback(self, callback: Callable[['ModelNode'], None]):
+        self._on_set_id_callbacks.append(callback)
 
     def to_dict(self):
         fields = dataclasses.fields(self)
@@ -55,6 +69,10 @@ class ModelNode:
     @property
     def uid(self) -> str:
         return str(self.id)
+
+    @property
+    def tuid(self) -> str:
+        return str(self.typed_id)
 
     @property
     def attributes(self) -> dict:
@@ -121,6 +139,10 @@ class ModelNode:
     def get(self, attribute_name: Any, default=None) -> Any:
         return self.attributes.get(attribute_name, default)
 
+    def delete(self, attribute_name: Any):
+        if attribute_name in self.attributes:
+            del self.attributes[attribute_name]
+
     def get_position_2d(self, create_default_position: bool = True):
         if not create_default_position and "pos" not in self.attributes:
             return None
@@ -176,6 +198,7 @@ class ModelNode:
 
     def __hash__(self):
         return hash(self.uid)
+        #return hash(str(id(self)))
 
     def __eq__(self, other):
         if isinstance(other, ModelNode):
@@ -218,3 +241,17 @@ class ModelNode:
 
     def get_description_lines(self) -> List[str]:
         return []
+    
+    def get_configuration(self) -> dict:
+        return self._attributes.get("configuration", {})
+    
+    def set_configuration(self, configuration: dict):
+        if not isinstance(configuration, dict):
+            raise AttributeError("Configuration must be of type dict")
+        self._attributes["configuration"] = configuration
+
+    def set_configuration_key(self, key, value):
+        self._attributes.setdefault("configuration", {})[key] = value
+
+    def get_configuration_key(self, key, default=None):
+        return self._attributes.setdefault("configuration", {}).get(key, default)

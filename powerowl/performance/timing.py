@@ -54,7 +54,10 @@ class Timing:
         self._duration = self._duration_ns / 10**9
 
         if self._as_sum_timing:
-            self._parent.add_sum_timing(self.message, self._duration_ns)
+            if self._parent is None and self.print_enabled:
+                self.auto_print()
+            else:
+                self._parent.add_sum_timing(self.message, self._duration_ns)
         elif self.print_enabled:
             self.auto_print()
 

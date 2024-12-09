@@ -34,7 +34,7 @@ class Motor(GridAsset):
             As("efficiency", Gvc.CONFIGURATION, float, 100, Unit.PERCENT),
             As("loading", Gvc.CONFIGURATION, float, 100, Unit.PERCENT),
             As("scaling", Gvc.CONFIGURATION, float, 1),
-            As("in_service", Gvc.CONFIGURATION, bool, True),
+            As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
             As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
             As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE)

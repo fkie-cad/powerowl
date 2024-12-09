@@ -14,6 +14,7 @@ from powerowl.graph.enums.layer_matching_strategy import LayerMatchingStrategy
 from powerowl.graph.model_node import ModelNode
 from powerowl.layers.network.interface import Interface
 from powerowl.layers.network.link import Link
+from powerowl.layers.network.switch import Switch
 from powerowl.performance.timing import Timing
 
 
@@ -91,20 +92,27 @@ class Subnet(ModelNode):
 
     def create_minimum_spanning_tree(self, layer_graph: Optional[nx.Graph] = None):
         """
-        Derives a minimum spanning tree of all nodes in the given subnet, i.e., it removes links that are
-        responsible for loops.
+        Derives a minimum spanning tree of all switches in the given subnet, i.e., it removes links that are
+        responsible for loops between switches.
         """
         if layer_graph is None:
             layer_graph = self.mlg.get_layer_graph(self.mlg.get_layer(Layers.NETWORK), edge_type_filter={EdgeType.NETWORK_LINK})
 
-        
         subnet_node_ids: Set[str] = set()
         for interface in self.get_interfaces():
-            subnet_node_ids.add(interface.uid)
             link = interface.get_network_link()
-            if link is not None:
-                subnet_node_ids.add(link.uid)
-            subnet_node_ids.add(interface.get_network_node().uid)
+            if link is None:
+                continue
+            other_interface = link.get_other_interface(interface)
+            node_a = interface.get_network_node()
+            node_b = other_interface.get_network_node()
+            if not isinstance(node_a, Switch) or not isinstance(node_b, Switch):
+                continue
+            subnet_node_ids.add(interface.uid)
+            subnet_node_ids.add(other_interface.uid)
+            subnet_node_ids.add(link.uid)
+            subnet_node_ids.add(node_a.uid)
+            subnet_node_ids.add(node_b.uid)
         subnet_graph = layer_graph.subgraph(subnet_node_ids)
         subnet_edges = sorted(sorted(e) for e in subnet_graph.edges())
 

@@ -1,10 +1,12 @@
-from typing import Any, List, Union
+import traceback
+import warnings
+from typing import Any, List, Union, Optional, Dict, Callable, Set, Tuple
 
 import igraph
 import networkx as nx
 
 from powerowl.graph.enums import Layers, EdgeType
-from powerowl.layers.powergrid.elements import Bus
+from powerowl.layers.powergrid.elements import Bus, Line, DcLine, Switch
 from .elements.grid_annotator import GridAnnotator
 from .elements.grid_asset import GridAsset
 from .elements.grid_edge import GridEdge
@@ -18,7 +20,56 @@ class PowerGridModel:
     def __init__(self, **kwargs):
         self._kwargs = kwargs
         self.elements = {}
+        self.profiles = {}
         self.builder = PowerGridModelBuilder(self)
+
+        self._pre_sim_noise_callback: Optional[Callable[[int, GridValue, Any], Any]] = None
+        self._post_sim_noise_callback: Optional[Callable[[int, GridValue, Any], Any]] = None
+        self._measurement_noise_callback: Optional[Callable[[int, GridValue, Any], Any]] = None
+        self._on_simulation_configuration_changed_callback: Optional[Callable] = None
+        self._on_simulation_iteration_synchronization: Optional[Callable[[bool], None]] = None
+        self._on_protection_equipment_triggered: Optional[Callable[[GridElement, str], None]] = None
+
+        self._options = {}
+
+    def set_option(self, key: str, value: Any):
+        self._options[key] = value
+
+    def get_option(self, key: str, default: Any = None) -> Any:
+        return self._options.get(key, default)
+
+    def set_on_simulation_configuration_changed_callback(self, callback: Optional[Callable] = None):
+        self._on_simulation_configuration_changed_callback = callback
+
+    def notify_simulation_configuration_changed(self):
+        if self._on_simulation_configuration_changed_callback is not None:
+            self._on_simulation_configuration_changed_callback()
+
+    def set_pre_sim_noise_callback(self, callback: Optional[Callable[[int, GridValue, Any], Any]] = None):
+        self._pre_sim_noise_callback = callback
+
+    def set_post_sim_noise_callback(self, callback: Optional[Callable[[int, GridValue, Any], Any]] = None):
+        self._post_sim_noise_callback = callback
+
+    def set_measurement_noise_callback(self, callback: Optional[Callable[[int, GridValue, Any], Any]] = None):
+        self._measurement_noise_callback = callback
+
+    def set_on_simulation_iteration_synchronization(self, callback: Optional[Callable[[bool], None]]):
+        self._on_simulation_iteration_synchronization = callback
+
+    def notify_simulation_iteration_synchronization(self, success: bool):
+        if self._on_simulation_iteration_synchronization is not None:
+            self._on_simulation_iteration_synchronization(success)
+
+    def set_on_protection_equipment_triggered(self, callback: Optional[Callable[[GridElement, str], None]]):
+        self._on_protection_equipment_triggered = callback
+
+    def trigger_on_protection_equipment_triggered(self, grid_element: GridElement, protection_name: str):
+        if self._on_protection_equipment_triggered is not None:
+            try:
+                self._on_protection_equipment_triggered(grid_element, protection_name)
+            except Exception as e:
+                warnings.warn(f"Error during protection equipment trigger callback: {e=}")
 
     def simulate(self) -> bool:
         raise NotImplementedError()
@@ -32,30 +83,44 @@ class PowerGridModel:
     def to_dict(self) -> dict:
         return {
             "kwargs": self._kwargs,
-            "elements": self.elements.copy()
+            "elements": self.elements.copy(),
+            "profiles": self.profiles
         }
 
-    def clone(self) -> 'PowerGridModel':
+    def clone(self, clone_base: Optional['PowerGridModel'] = None) -> 'PowerGridModel':
         """
         Clones this model (recursively)
         """
-        clone = self.__class__()
+        if clone_base is None:
+            clone = self.__class__()
+        else:
+            clone = clone_base
         clone.from_primitive_dict(self.to_primitive_dict())
         return clone
 
-    def to_primitive_dict(self) -> dict:
+    def get_free_index(self, element_type: str) -> int:
+        indices = [grid_element.index for grid_element in self.elements[element_type]]
+        return max(indices) + 1
+
+    def to_primitive_dict(self, options: Optional[Dict] = None) -> dict:
+        default_options = {}
+        if options is None:
+            options = {}
+        default_options.update(options)
+        options = default_options
         d = self.to_dict()
         elements = d["elements"]
         primitive_elements = {}
         for e_type, elements_of_type in elements.items():
             primitive_elements[e_type] = {}
             for e_id, element in elements_of_type.items():
-                primitive_elements[e_type][e_id] = element.to_primitive_dict()
+                primitive_elements[e_type][e_id] = element.to_primitive_dict(options)
         d["elements"] = primitive_elements
         return d
 
     def from_primitive_dict(self, power_grid_dict: dict):
         self._kwargs = power_grid_dict.get("kwargs", {})
+        self.profiles = power_grid_dict.get("profiles", {})
         self.elements = {}
         primitive_dicts = {}
         for element_type, elements in power_grid_dict["elements"].items():
@@ -69,6 +134,12 @@ class PowerGridModel:
 
     def get_element(self, element_type: str, element_id: int) -> GridElement:
         return self.elements[element_type][element_id]
+
+    def get_elements(self):
+        elements = []
+        for element_type in self.elements.keys():
+            elements.extend(self.get_elements_by_type(element_type))
+        return elements
 
     def get_element_by_identifier(self, element_identifier: str) -> GridElement:
         element_type, element_id = element_identifier.split(".")
@@ -94,6 +165,7 @@ class PowerGridModel:
 
     def from_dict(self, dict_representation: dict):
         self.elements = dict_representation["elements"]
+        self.profiles = dict_representation.get("profiles", {})
         self._kwargs = dict_representation["kwargs"]
 
     def from_external(self, external_model: Any):
@@ -115,7 +187,7 @@ class PowerGridModel:
         return ["load", "sgen", "gen", "impedance", "shunt", "ward", "storage", "external_grid"]
 
     @staticmethod
-    def edge_associated_elements():
+    def annotator_elements():
         return ["switch"]
 
     def get_annotators(self, grid_element: Union[GridEdge, Bus]):
@@ -132,7 +204,7 @@ class PowerGridModel:
             return results
         else:
             results = set()
-            for annotator_type in self.edge_associated_elements():
+            for annotator_type in self.annotator_elements():
                 annotator: GridAnnotator
                 for annotator in self.get_elements_by_type(annotator_type):
                     bus_a = annotator.get_bus()
@@ -141,10 +213,75 @@ class PowerGridModel:
                         results.add(annotator)
             return results
 
+    def find_neighbor_buses(self, bus: Bus):
+        """
+        Returns all buses that are connected to the given bus via a GridEdge.
+        This explicitly does not include multi-bus-bars.
+        @param bus: The bus to check neighbors for
+        @return: The list of buses that are connected to the given bus via a GridEdge.
+        """
+        neighbor_buses = set()
+        edges = self.get_edges()
+        for edge in edges:
+            if edge.get_bus_a() == bus or edge.get_bus_b() == bus:
+                neighbor_buses.add(edge.get_other_bus(bus))
+        return list(neighbor_buses)
+
+    def find_all_neighbor_buses(self, bus: Bus) -> List[Tuple[Bus, bool]]:
+        """
+        Returns all neighbor buses, i.e., also bus bars, that are connected via a grid edge or a switch.
+        Returns a list of tuples, where the first entry is the bus and the second entry indicates whether the connection is currently active,
+        i.e., if all switches are closed.
+        """
+        handled_buses = set()
+        buses = []
+        try:
+            for edge in self.get_edges():
+                if edge.get_bus_a() == bus or edge.get_bus_b() == bus:
+                    neighbor = edge.get_other_bus(bus)
+                    if neighbor in handled_buses:
+                        continue
+                    handled_buses.add(neighbor)
+                    connected = True
+                    for annotator in self.get_annotators(edge):
+                        if isinstance(annotator, Switch):
+                            value = annotator.get_config_value("closed")
+                            if type(value) is not bool:
+                                value = False
+                            connected &= value
+                    buses.append((neighbor, connected))
+            annotator: GridAnnotator
+            for annotator in self.get_annotators(bus):
+                if not isinstance(annotator, Switch):
+                    continue
+                if isinstance(annotator.get_associated(), Bus):
+                    other_bus = annotator.get_bus()
+                    if other_bus == bus:
+                        other_bus = annotator.get_associated()
+                    if other_bus in handled_buses:
+                        continue
+                    buses.append((other_bus, annotator.get_config_value("closed")))
+        except Exception as e:
+            warnings.warn(f"{traceback.format_exc()}")
+        finally:
+            return buses
+
     def get_bus(self, index) -> Bus:
         if isinstance(index, GridValue):
             index = index.value
         return self.elements["bus"][index]
+
+    def get_buses(self) -> List[Bus]:
+        return list(self.elements.get("bus", {}).values())
+
+    def get_lines(self) -> List[Union[Line, DcLine]]:
+        return list(self.elements.get("line", {}).values()) + list(self.elements.get("dcline", {}).values())
+
+    def get_edges(self) -> List[GridEdge]:
+        edges = []
+        for e_type in self.edge_elements():
+            edges.extend(list(self.elements.get(e_type, {}).values()))
+        return edges
 
     def to_nx_graph(self, with_layout: bool = True, **kwargs):
         graph = nx.Graph()
@@ -173,7 +310,7 @@ class PowerGridModel:
                 edge_props = {"type": EdgeType.PHYSICAL_POWER}
                 graph.add_edges_from([(elem.get_identifier(), bus.get_identifier(), edge_props)])
 
-        for e_type in self.edge_associated_elements():
+        for e_type in self.annotator_elements():
             for index, elem in self.elements.get(e_type, {}).items():
                 elem: GridAnnotator
                 # Physical to Bus

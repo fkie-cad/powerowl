@@ -1,17 +1,23 @@
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, List, Type, Union
+from typing import TYPE_CHECKING, Optional, List, Type, Union, Dict
 
 import networkx as nx
 
 from powerowl.exceptions import DerivationError
 from powerowl.exceptions.layer_not_found_exception import LayerNotFoundException
 from powerowl.exceptions.model_node_not_found_exception import ModelNodeNotFoundException
+from powerowl.exceptions.reiterate_derivation_exception import ReiterateDerivationException
 from powerowl.graph import MultiLayerGraph
 from powerowl.graph.enums import Layers
 from powerowl.graph.enums.plot_grouping_mode import PlotGroupingMode
+from powerowl.graph.model_edge import ModelEdge
 from powerowl.graph.model_node import ModelNode
 from powerowl.layers.facilities import Facility
+from powerowl.layers.network.router import Router
+from powerowl.layers.network.switch import Switch
+from powerowl.layers.network.rtu import RTU
+from powerowl.layers.network.mtu import MTU
 from powerowl.layers.ou import OrganizationalUnit
 from powerowl.layers.powergrid import PowerGridModel
 from powerowl.layers.powergrid.elements import GridElement
@@ -19,6 +25,7 @@ from powerowl.performance.timing import Timing
 
 if TYPE_CHECKING:
     from powerowl.derivators.derivator import Derivator
+
 
 class PowerOwl:
     """
@@ -33,12 +40,15 @@ class PowerOwl:
     to a scenario configuration to be used with simulation or emulation tools.
     """
     _gid: int = 0
+    _typed_ids: Dict[Type, int] = {}
 
     def __init__(self, power_grid: Optional['PowerGridModel'] = None, **kwargs):
         """
         Creates a Power Owl Instance.
         """
         self._gid = 0
+        self.mlg: Optional[MultiLayerGraph] = None
+        self.power_grid: Optional['PowerGridModel'] = power_grid
         self._config = {
             "show_warnings": False,
             "draw_node_grouping": PlotGroupingMode.PER_FACILITY_OR_LAYER,
@@ -50,9 +60,13 @@ class PowerOwl:
         if "enable_timing" in kwargs:
             Timing.enabled = kwargs.get("enable_timing", True)
         self._config.update(kwargs)
+        self._reset()
+
+    def _reset(self):
+        self.reset_global_id()
+        PowerOwl._typed_ids = {}
         self.mlg = MultiLayerGraph(owl=self)
-        self.power_grid = power_grid
-        if power_grid is not None:
+        if self.power_grid is not None:
             self.mlg.add_layer(Layers.POWER_GRID, from_graph=self.power_grid.to_nx_graph())
             self.mlg.add_layer_object(Layers.POWER_GRID, self.power_grid)
 
@@ -66,6 +80,26 @@ class PowerOwl:
 
     def configure(self, **kwargs):
         self._config.update(kwargs)
+
+    def set_data(self, context, key, value):
+        self._data.setdefault(context, {})[key] = value
+
+    def append_data(self, context, key, value):
+        try:
+            self._data.setdefault(context, {}).setdefault(key, []).append(value)
+        except Exception:
+            raise KeyError(f"{key} is not of type list for context {context}")
+
+    def extend_data(self, context, key, values):
+        try:
+            self._data.setdefault(context, {}).setdefault(key, []).extend(values)
+        except Exception:
+            raise KeyError(f"{key} is not of type list for context {context}")
+
+    def get_data(self, context, key = None, default_value=None):
+        if key is None:
+            return self._data.get(context, {})
+        return self._data.get(context, {}).get(key, default_value)
 
     def encode(self, include_layer_objects: bool = True) -> dict:
         """
@@ -116,13 +150,49 @@ class PowerOwl:
         return exporter.export(target_folder)
 
     @staticmethod
-    def next_global_id() -> int:
+    def next_global_id(model_element: Optional[Union[ModelNode, ModelEdge]] = None) -> int:
         PowerOwl._gid += 1
         return PowerOwl._gid
 
+    @staticmethod
+    def next_typed_id(cls: Type) -> int:
+        PowerOwl._typed_ids.setdefault(cls, 0)
+        PowerOwl._typed_ids[cls] += 1
+        return PowerOwl._typed_ids[cls]
+
+    @staticmethod
+    def reset_global_id():
+        PowerOwl._gid = 0
+
     def derive(self, derivator_class: Type['Derivator'], **kwargs):
-        derivator: 'Derivator' = derivator_class(self, **kwargs)
-        derivator.derive()
+        namesets = kwargs.pop('namesets', [])
+
+        iterate = True
+        iteration = 0
+        max_iterations = 10
+        while iterate:
+            use_stable_ids = self._config.get("use_stable_ids", True)
+            iterate = False
+            iteration += 1
+            if iteration > max_iterations:
+                print(f"No more iterations available. Giving up")
+                return
+            try:
+                derivator: 'Derivator' = derivator_class(self, **kwargs)
+                derivator.derive()
+                if use_stable_ids:
+                    print("Applying stable IDs")
+                    self._apply_stable_ids()
+            except ReiterateDerivationException as e:
+                print(f"Reiteration requested in iteration {iteration}")
+                config = e.updated_configuration
+                grid = e.power_grid_model
+                kwargs["config"] = config
+                self.power_grid = grid
+                for nameset in namesets:
+                    nameset.reset()
+                self._reset()
+                iterate = True
 
     def layout(self):
         return self.mlg.layout()
@@ -155,6 +225,15 @@ class PowerOwl:
         self._multi_derive(derivator_classes)
 
     def get_model_node_of_power_grid_element(self, element: GridElement) -> ModelNode:
+        # Try to get node by identifier
+        try:
+            node = self.mlg.get_model_node(element.get_identifier())
+            if node.get_grid_element() == element:
+                return node
+        except KeyError:
+            pass
+
+        # Fallback: Full search
         for model_node in self.mlg.get_nodes_at_layers({self.mlg.get_layer(Layers.POWER_GRID)}):
             if model_node.get_grid_element() == element:
                 return model_node
@@ -200,19 +279,58 @@ class PowerOwl:
         return None
 
     def get_power_grid_dict(self, *, include_facilities: bool = True) -> dict:
-        power_grid_dict = self.power_grid.to_primitive_dict()
         if not include_facilities:
-            return power_grid_dict
+            return self.power_grid.to_primitive_dict()
+        # Add Facilities
         for e_type, elements in self.power_grid.elements.items():
             for e_id, element_dict in elements.items():
                 element = self.power_grid.get_element(e_type, e_id)
                 node = self.get_model_node_of_power_grid_element(element)
-                node_e_type = element.prefix
-                node_id = element.index
-                facility_id, facility_name = None, None
                 facility = self.get_facility(node)
                 if facility is not None:
-                    facility_id, facility_name = facility.id, facility.name
-                power_grid_dict["elements"][node_e_type][node_id]["facility_id"] = facility_id
-                power_grid_dict["elements"][node_e_type][node_id]["facility_name"] = facility_name
-        return power_grid_dict
+                    element.set_data("facility_id", facility.id)
+                    element.set_data("facility_name", facility.name)
+        return self.power_grid.to_primitive_dict()
+
+    def _apply_stable_ids(self, step: int = 100, minimum_gap: int = 50):
+        """
+        Updates all node IDs to be more stable between different iterations
+        """
+        priorities = {
+            ModelNode: -1,
+            Facility: 1,
+            MTU: 100,
+            RTU: 50,
+            Switch: 40,
+            Router: 45
+        }
+        node_types = sorted(self._typed_ids.keys(), key=lambda cls: priorities.get(cls, 0), reverse=True)
+        id_map = {}
+
+        def apply_step(_id) -> int:
+            r = _id % step
+            _id = _id + (step - r)
+            if step - r < minimum_gap:
+                _id += step
+            return _id
+
+        remapped_id: int = 0
+        step_required = False
+        for node_type in node_types:
+            if step_required:
+                pre_step = remapped_id
+                remapped_id = apply_step(remapped_id)
+            step_required = False
+            for node in self.mlg.get_nodes_by_class(node_type):
+                remapped_id += 1
+                id_map[node.uid] = remapped_id
+                step_required = True
+
+        pre_step = remapped_id
+        remapped_id = apply_step(remapped_id)
+        for edge in self.mlg.get_edges():
+            remapped_id += 1
+            edge.set_id(remapped_id)
+
+        self.mlg.relabel_nodes(id_map)
+

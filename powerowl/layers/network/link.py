@@ -1,6 +1,6 @@
 import dataclasses
 import warnings
-from typing import List, cast
+from typing import List, cast, Optional
 
 from .interface import Interface
 from .link_type import LinkType
@@ -26,6 +26,17 @@ class Link(NetworkEntity):
         if len(neighbors) != 2:
             warnings.warn(f"Link {self.id} has {len(neighbors)} interfaces, should be 2")
         return [cast(Interface, neighbor) for neighbor in neighbors]
+
+    def get_other_interface(self, interface: 'Interface') -> Optional['Interface']:
+        interfaces = self.get_interfaces()
+        if len(interfaces) != 2:
+            return None
+        if interfaces[0] == interface:
+            return interfaces[1]
+        elif interfaces[1] == interface:
+            return interfaces[0]
+        warnings.warn(f"Could not find other interface for {interface.uid} at link {self.uid}")
+        return None
 
     def get_link_properties(self) -> dict:
         return {

@@ -1,7 +1,7 @@
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_namespace_packages, find_packages
 
 """
-                                                    
+
 ########     #######    ##      ##   ########   ########      ^___^     ##      ##   ##       
 ##     ##   ##     ##   ##  ##  ##   ##         ##     ##    ##   ##    ##  ##  ##   ##       
 ##     ##   ##     ##   ##  ##  ##   ##         ##     ##   ## O O ##   ##  ##  ##   ##       
@@ -15,18 +15,15 @@ from setuptools import setup, find_namespace_packages
 
 setup(
     name='powerowl',
-    version="0.1.0",
-    packages=find_namespace_packages(include=[
-        'powerowl.*'
-    ]),
+    version="0.3.0",
+    packages=find_packages(),
     install_requires=[
-        'ipaddress==1.0.23',
+        'ipaddress>=1.0.23',
         'matplotlib>=3.1.2',
-        'netifaces==0.11.0',
+        'netifaces>=0.11.0',
         'networkx>=2.5',
         'numpy',
-        #'pandapower==2.13.2', # Not yet released but contains critical bug fix
-        'pandapower @ git+https://github.com/e2nIEE/pandapower.git',
+        'pandapower==2.14.6',
         'pandas',
         'pydot',
         'plotly',

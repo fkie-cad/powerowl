@@ -1,6 +1,7 @@
 from .control_center import ControlCenter
 from .distribution_substation import DistributionSubstation
 from .facility import Facility
+from .grid_connection_station import GridConnectionStation
 from .junction_box import JunctionBox
 from .office import Office
 from .power_plant import PowerPlant

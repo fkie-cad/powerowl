@@ -5,6 +5,9 @@ from powerowl.graph.model_node import ModelNode
 from powerowl.layers.network.configuration.data_point_value import DataPointValue
 from powerowl.layers.network.configuration.protocols.protocol_info import ProtocolInfo
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
+from powerowl.layers.powergrid.values.grid_value_type import Step
+from powerowl.layers.powergrid.values.units.scale import Scale
+from powerowl.layers.powergrid.values.units.unit import Unit
 
 
 @dataclass(kw_only=True)
@@ -13,9 +16,12 @@ class DataPoint(ModelNode):
     description: Optional[str] = None
     value_type: Type[DataPointValue] = None
     value: DataPointValue = None
+    scale: Scale = Scale.NONE
+    unit: Unit = Unit.NONE
     protocol: Optional[ProtocolInfo] = None
     providers: List[ProviderInfo] = field(default_factory=list)
     coupling: Optional[str] = None
+    related_points: List[str] = field(default_factory=list)
 
     @property
     def data_point_id(self):
@@ -29,13 +35,19 @@ class DataPoint(ModelNode):
         provider: ProviderInfo
         for provider in self.providers:
             providers.setdefault(provider.export_domain, []).append(provider.get_provider_dict(as_primitive=as_primitive))
+        value = self.value
+        if isinstance(value, Step):
+            value = value.value
         # Build information dict
         d = {
             "identifier": self.data_point_id,
             "description": self.description,
-            "value": self.value,
+            "value": value,
             "providers": providers,
-            "coupling": self.coupling
+            "scale": self.scale.name,
+            "unit": self.unit.name,
+            "coupling": self.coupling,
+            "related": [dp.data_point_id for dp in self.related_points]
         }
         # Add Protocol Information
         d.update(self.protocol.get_protocol_dict(as_primitive=as_primitive))

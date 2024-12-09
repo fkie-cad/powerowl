@@ -14,6 +14,10 @@ class Facilities(str, enum.Enum):
     WIND_POWER_PLANT = "wind-power-plant"
     VIRTUAL_POWER_PLANT = "wind-power-plant"
 
+    HOUSEHOLD = "household"
+
+    GRID_CONNECTION_STATION = "grid-connection-station"
+
     GENERIC = "generic"
 
     def short_name(self) -> str:
@@ -28,5 +32,9 @@ class Facilities(str, enum.Enum):
             Facilities.POWER_PLANT: "PowerP",
             Facilities.SOLAR_POWER_PLANT: "SolarP",
             Facilities.WIND_POWER_PLANT: "WindP",
-            Facilities.VIRTUAL_POWER_PLANT: "VPP"
+            Facilities.VIRTUAL_POWER_PLANT: "VPP",
+
+            Facilities.HOUSEHOLD: "Household",
+
+            Facilities.GRID_CONNECTION_STATION: "Ext.Grid"
         }.get(self, self.value)

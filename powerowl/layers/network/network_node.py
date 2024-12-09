@@ -15,7 +15,20 @@ if TYPE_CHECKING:
 @dataclasses.dataclass(eq=False, kw_only=True)
 class NetworkNode(NetworkEntity):
     def get_role(self) -> str:
+        if self._attributes.get("role") is not None:
+            return self._attributes["role"]
         return self.__class__.__name__.lower()
+    
+    def has_role(self, role: str):
+        return self.get_role() == role or role in self._attributes.get("roles", [])
+
+    def add_role(self, role: str):
+        if self.has_role(role):
+            return
+        if self._attributes.get("role") is None:
+            self._attributes["role"] = role
+        else:
+            self._attributes.setdefault("roles", []).append(role)
 
     def get_interfaces(self) -> List['Interface']:
         from .interface import Interface

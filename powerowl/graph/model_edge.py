@@ -1,6 +1,6 @@
 import dataclasses
 import hashlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, List
 
 from powerowl.graph.enums import EdgeType
 from powerowl.graph.enums.layer_matching_strategy import LayerMatchingStrategy
@@ -18,7 +18,8 @@ class ModelEdge:
 
     def __post_init__(self):
         from powerowl.power_owl import PowerOwl
-        self.id: int = PowerOwl.next_global_id()
+        self.id: int = PowerOwl.next_global_id(self)
+        self._on_set_id_callbacks: List[Callable[['ModelNode'], None]] = []
 
     def to_dict(self):
         return {
@@ -39,8 +40,16 @@ class ModelEdge:
         return self.node_a.mlg
 
     @property
-    def uid(self):
+    def uid(self) -> id:
         return self.id
+
+    def set_id(self, id: int):
+        self.id = id
+        for on_set_id in self._on_set_id_callbacks:
+            on_set_id(self)
+
+    def add_on_set_id_callback(self, callback: Callable[['ModelNode'], None]):
+        self._on_set_id_callbacks.append(callback)
 
     def is_inter_layer_edge(self,
                             layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.TRANSITIVE
@@ -59,13 +68,13 @@ class ModelEdge:
         return self.edge_type.get_short_name()
 
     def __str__(self):
-        return f'"{self.node_a.uid}<-{self.get_short_type()}@-{self.id}->{self.node_a.uid}"'
+        return f'"{self.node_a.uid}<-{self.get_short_type()}@-{self.id}->{self.node_b.uid}"'
 
     def __repr__(self):
         return str(self)
 
     def __hash__(self):
-        return int.from_bytes(hashlib.sha256(str(self).encode("utf-8")).digest(), byteorder="little")
+        return int.from_bytes(hashlib.sha256(str(self.id).encode("utf-8")).digest(), byteorder="little")
 
     def __eq__(self, other):
         if isinstance(other, ModelEdge):

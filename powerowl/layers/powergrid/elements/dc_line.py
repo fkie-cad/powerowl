@@ -31,10 +31,10 @@ class DcLine(GridEdge):
             As("minimum_reactive_power_to", Gvc.PROPERTY, float, None, Unit.VAR, Scale.BASE, required=False),
             As("maximum_reactive_power_to", Gvc.PROPERTY, float, None, Unit.VAR, Scale.BASE, required=False),
 
-            As("in_service", Gvc.CONFIGURATION, bool, True),
-            As("active_power", Gvc.CONFIGURATION, float, None, Unit.WATT, Scale.BASE),
-            As("voltage_from_bus", Gvc.CONFIGURATION, float, None, Unit.PER_UNIT),
-            As("voltage_to_bus", Gvc.CONFIGURATION, float, None, Unit.PER_UNIT),
+            As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
+            #As("active_power", Gvc.CONFIGURATION, float, None, Unit.WATT, Scale.BASE),
+            #As("voltage_from_bus", Gvc.CONFIGURATION, float, None, Unit.PER_UNIT),
+            #As("voltage_to_bus", Gvc.CONFIGURATION, float, None, Unit.PER_UNIT),
 
             As("active_power_from", Gvc.MEASUREMENT, float, None, Unit.WATT, Scale.BASE, required=False),
             As("reactive_power_from", Gvc.MEASUREMENT, float, None, Unit.VAR, Scale.BASE, required=False),

@@ -3,6 +3,7 @@ from abc import ABC
 from typing import Optional, Set, TYPE_CHECKING, List
 
 from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
+from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
 from powerowl.layers.powergrid.elements.grid_element import GridElement
 from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
 
@@ -28,7 +29,15 @@ class GridEdge(GridElement, ABC):
     def get_to_bus(self):
         return self.get_property_value("to_bus")
 
-    def get_providers(self, filtered: bool = False, busses: Optional[Set['Bus']] = None) -> List[PowerGridProviderInfo]:
+    def get_other_bus(self, bus: 'Bus') -> 'Bus':
+        if self.get_bus_a() == bus:
+            return self.get_bus_b()
+        return self.get_bus_a()
+
+    def get_buses(self) -> List['Bus']:
+        return [self.get_bus_a(), self.get_bus_b()]
+
+    def get_providers(self, filtered: bool = False, busses: Optional[Set['Bus']] = None) -> List[ProviderInfo]:
         providers = super().get_providers(filtered=filtered)
         if busses is None:
             return providers
