@@ -1,4 +1,5 @@
 import abc
+import logging
 from typing import TYPE_CHECKING, Optional
 
 from powerowl.simulators.pandapower.processors.processor_return_action import ProcessorReturnAction
@@ -8,6 +9,15 @@ if TYPE_CHECKING:
 
 
 class Processor(abc.ABC):
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        self._logger = logger
+
+    def log(self, message: str, level=logging.INFO):
+        if self._logger is None:
+            print(f"[{logging.getLevelName(level)}] {message}")
+            return
+        self._logger.log(level, message)
+
     def apply_pre_simulation_processing(self, grid_model: 'PandaPowerGridModel', simulation_step_interval: Optional[float] = None):
         pass
 

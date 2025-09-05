@@ -1,7 +1,7 @@
 from setuptools import setup, find_namespace_packages, find_packages
 
 """
-
+                                                    
 ########     #######    ##      ##   ########   ########      ^___^     ##      ##   ##       
 ##     ##   ##     ##   ##  ##  ##   ##         ##     ##    ##   ##    ##  ##  ##   ##       
 ##     ##   ##     ##   ##  ##  ##   ##         ##     ##   ## O O ##   ##  ##  ##   ##       
@@ -23,7 +23,7 @@ setup(
         'netifaces>=0.11.0',
         'networkx>=2.5',
         'numpy',
-        'pandapower==2.14.6',
+        'pandapower',
         'pandas',
         'pydot',
         'plotly',
@@ -33,7 +33,7 @@ setup(
         'shapely',
         'ifcfg'
     ],
-    python_requires=">=3.10.0",
+    python_requires=">=3.12.0",
     author="Lennart Bader (Fraunhofer FKIE)",
     author_email="lennart.bader@fkie.fraunhofer.de",
 )

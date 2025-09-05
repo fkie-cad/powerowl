@@ -1,7 +1,10 @@
+import warnings
 from dataclasses import dataclass
 from typing import List, TYPE_CHECKING
 
+from powerowl.graph.enums import Layers
 from powerowl.graph.model_node import ModelNode
+from powerowl.layers.network.rtu import RTU
 
 if TYPE_CHECKING:
     from powerowl.layers.network.configuration.protocols.iec61850.mms_logical_device import MMSLogicalDevice
@@ -18,9 +21,16 @@ class MMSModel(ModelNode):
     def __hash__(self):
         return hash(self.uid)
 
+    def get_ied_nodes(self) -> List['RTU']:
+        network_nodes = self.mlg.get_inter_layer_neighbors(self, other_layers={self.mlg.get_layer(Layers.NETWORK)})
+        ieds = [network_node for network_node in network_nodes if isinstance(network_node, RTU)]
+        if len(ieds) == 0:
+            raise ValueError("No inter-layer neighbors found.")
+        return ieds
+
     def get_mms_logical_devices(self) -> List['MMSLogicalDevice']:
         from powerowl.layers.network.configuration.protocols.iec61850.mms_logical_device import MMSLogicalDevice
-        devices = self.mlg.get_inter_layer_neighbors(self, neighbor_instance_filter={MMSLogicalDevice})
+        devices = self.mlg.get_intra_layer_neighbors(self, neighbor_instance_filter={MMSLogicalDevice})
         return devices
 
     def get_mms_logical_nodes(self) -> List['MMSLogicalNode']:

@@ -13,6 +13,7 @@ class EdgeType(str, enum.Enum):
     RESPONSIBLE = "responsible"
     IEC104_CONNECTION = "iec104"
     IP_SUBNET = "ip-subnet"
+    STREET = "street"
 
     def get_short_name(self) -> str:
         return self.value[:3]

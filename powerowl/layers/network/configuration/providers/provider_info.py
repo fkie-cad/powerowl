@@ -5,11 +5,18 @@ from powerowl.layers.network.configuration.providers.provider_name import Provid
 
 
 class ProviderInfo(abc.ABC):
+    _provider_id: int = 0
+
     def __init__(self, provider_name: ProviderName):
+        self.provider_id = ProviderInfo._provider_id
+        ProviderInfo._provider_id += 1
         self.provider_name = provider_name
         self._domain = "source"
         self._coupling = None
         self._transform = None
+
+    def __hash__(self):
+        return hash(self._provider_id)
 
     @property
     def domain(self):
@@ -18,6 +25,12 @@ class ProviderInfo(abc.ABC):
     @property
     def export_domain(self):
         return f"{self._domain}s"
+
+    def is_monitoring(self) -> bool:
+        return self.domain == "source"
+
+    def is_control(self) -> bool:
+        return self.domain == "target"
 
     @domain.setter
     def domain(self, domain: str):

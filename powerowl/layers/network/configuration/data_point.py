@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Type
 
 from powerowl.graph.model_node import ModelNode
+from powerowl.layers.network.configuration.data_point_type import DataPointType
 from powerowl.layers.network.configuration.data_point_value import DataPointValue
 from powerowl.layers.network.configuration.protocols.protocol_info import ProtocolInfo
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
@@ -41,6 +42,7 @@ class DataPoint(ModelNode):
         # Build information dict
         d = {
             "identifier": self.data_point_id,
+            "type": self.get_data_point_type().value,
             "description": self.description,
             "value": value,
             "providers": providers,
@@ -82,3 +84,6 @@ class DataPoint(ModelNode):
         if isinstance(other, DataPoint):
             return other.data_point_id == self.data_point_id
         return False
+
+    def get_data_point_type(self) -> DataPointType:
+        return DataPointType.DATA_POINT

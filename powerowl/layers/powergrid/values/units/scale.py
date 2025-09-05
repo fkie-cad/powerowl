@@ -8,6 +8,7 @@ class Scale(Decimal, enum.Enum):
     """
     NONE = 0
 
+    NANO = Decimal("1e-9")
     MICRO = Decimal("1e-6")
     MILLI = Decimal("1e-3")
     BASE = Decimal("1e0")
@@ -22,6 +23,7 @@ class Scale(Decimal, enum.Enum):
         :return: The prefix.
         """
         return {
+            Scale.NANO: "n",
             Scale.MICRO: "µ",
             Scale.MILLI: "m",
             Scale.NONE: "",
@@ -31,6 +33,11 @@ class Scale(Decimal, enum.Enum):
             Scale.GIGA: "G",
             Scale.TERA: "T"
         }.get(self)
+
+    def get_prefix_text(self, postfix="") -> str:
+        if self == Scale.NONE or self == Scale.BASE:
+            return ""
+        return f"{self.name.capitalize()}{postfix}"
 
     def to_base(self, value) -> float:
         """

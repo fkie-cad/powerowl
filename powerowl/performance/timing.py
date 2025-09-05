@@ -3,6 +3,7 @@ import re
 import textwrap
 import threading
 import time
+from pathlib import Path
 from typing import Dict
 
 
@@ -89,6 +90,9 @@ class Timing:
         self._end_time_ns = -1
         self._duration = -1
         self._duration_ns = -1
+
+    def export(self, output: Path):
+        pass
 
     def get_indent(self):
         if self._parent is None:

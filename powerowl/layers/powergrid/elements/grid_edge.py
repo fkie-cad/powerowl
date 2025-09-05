@@ -1,4 +1,3 @@
-import abc
 from abc import ABC
 from typing import Optional, Set, TYPE_CHECKING, List
 

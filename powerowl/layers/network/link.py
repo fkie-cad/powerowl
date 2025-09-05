@@ -5,8 +5,6 @@ from typing import List, cast, Optional
 from .interface import Interface
 from .link_type import LinkType
 from .network_entity import NetworkEntity
-from ...graph.enums import Layers
-from ...graph.enums.layer_matching_strategy import LayerMatchingStrategy
 
 
 @dataclasses.dataclass(eq=False, kw_only=True)

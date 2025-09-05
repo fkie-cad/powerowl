@@ -1,9 +1,7 @@
-import sys
-from typing import Optional, Type, Any, TYPE_CHECKING
+from typing import Optional
 
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
 from powerowl.layers.network.configuration.providers.provider_name import ProviderName
-from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
 
 
 class ProtectionEventProviderInfo(ProviderInfo):

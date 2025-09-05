@@ -1,12 +1,11 @@
-from typing import List, Set
+from typing import List
 
 from .attribute_specification import AttributeSpecification as As
-from .grid_edge import GridEdge
 from .bus import Bus
+from .grid_edge import GridEdge
 from ..values.grid_value_context import GridValueContext as Gvc
 from ..values.units.scale import Scale
 from ..values.units.unit import Unit
-from ...network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
 
 
 class DcLine(GridEdge):

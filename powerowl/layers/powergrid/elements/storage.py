@@ -52,15 +52,15 @@ class Storage(GridAsset):
 
             As("target_cos_phi", Gvc.CONFIGURATION, float, None, simulation_context=False, lower_bound=0, upper_bound=1),
             As("target_active_power_percentage", Gvc.CONFIGURATION, float, 100, Unit.PERCENT, Scale.BASE, lower_bound=-100, upper_bound=100),
-            As("target_active_power", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
-            As("target_reactive_power", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
+            As("target_active_power", Gvc.CONFIGURATION, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
+            As("target_reactive_power", Gvc.CONFIGURATION, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
             As("state_of_charge", Gvc.CONFIGURATION, float, 0, Unit.PERCENT, related=[(Gvc.MEASUREMENT, "state_of_charge")], operator_controllable=False),
             As("current_charge", Gvc.CONFIGURATION, float, 0, Unit.WATT_HOUR, related=[(Gvc.MEASUREMENT, "current_charge")], operator_controllable=False),
 
             As("is_connected", Gvc.MEASUREMENT, bool, True, simulation_context=False, source=(Gvc.CONFIGURATION, "connected")),
-            As("cos_phi", Gvc.MEASUREMENT, float, np.NAN, Unit.NONE, Scale.BASE, simulation_context=False, related=[(Gvc.CONFIGURATION, "target_cos_phi")]),
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")]),
+            As("cos_phi", Gvc.MEASUREMENT, float, np.nan, Unit.NONE, Scale.BASE, simulation_context=False, related=[(Gvc.CONFIGURATION, "target_cos_phi")]),
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")]),
             As("state_of_charge", Gvc.MEASUREMENT, float, 0, Unit.PERCENT, source=(Gvc.CONFIGURATION, "state_of_charge")),
             As("current_charge", Gvc.MEASUREMENT, float, 0, Unit.WATT_HOUR, source=(Gvc.CONFIGURATION, "current_charge"))
         ]

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Optional, Any, Union, Tuple, List, Callable
 from powerowl.graph.constants import FACILITY, OU
 from powerowl.graph.enums import EdgeType
 from powerowl.layers.powergrid.elements import GridElement
+from powerowl.performance.function_performance import measure
 
 if TYPE_CHECKING:
     from powerowl.graph.graph_layer import GraphLayer
@@ -42,6 +43,9 @@ class ModelNode:
             self.name = f"{self.__class__.__name__}.{self.id}"
         for on_set_id in self._on_set_id_callbacks:
             on_set_id(self)
+
+    def set_auto_name(self, auto_name: bool):
+        self._auto_name = auto_name
 
     def add_on_set_id_callback(self, callback: Callable[['ModelNode'], None]):
         self._on_set_id_callbacks.append(callback)
@@ -125,11 +129,14 @@ class ModelNode:
         if facility is not None:
             self.mlg.build_edge(self, facility, EdgeType.MEMBERSHIP)
 
+    @measure
     def set_ou(self, ou: Optional[Union[str, 'OrganizationalUnit']]):
         if ou is not None:
             ou = self.mlg.get_model_node(ou)
         old_ou = self.get_ou(False)
         self[OU] = ou
+        if old_ou == ou:
+            return
         if old_ou is not None:
             if self.mlg.has_edge(self, old_ou):
                 edge = self.mlg.get_edge(self, old_ou)
@@ -180,7 +187,7 @@ class ModelNode:
         pos3d_namespace.z = pos3d[2]
         return pos3d_namespace
 
-    def set_position_2d(self, pos_a: Union[float, Tuple[float]], y: Optional[float] = None):
+    def set_position_2d(self, pos_a: Union[float, Tuple[float, float]], y: Optional[float] = None):
         if isinstance(pos_a, Tuple):
             if len(pos_a) != 2:
                 raise AttributeError("When using pos_a as position tuple, it has to be of length 2")

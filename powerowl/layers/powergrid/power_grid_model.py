@@ -4,9 +4,10 @@ from typing import Any, List, Union, Optional, Dict, Callable, Set, Tuple
 
 import igraph
 import networkx as nx
-
 from powerowl.graph.enums import Layers, EdgeType
 from powerowl.layers.powergrid.elements import Bus, Line, DcLine, Switch
+from shapely.geometry.multipoint import MultiPoint
+
 from .elements.grid_annotator import GridAnnotator
 from .elements.grid_asset import GridAsset
 from .elements.grid_edge import GridEdge
@@ -29,6 +30,7 @@ class PowerGridModel:
         self._on_simulation_configuration_changed_callback: Optional[Callable] = None
         self._on_simulation_iteration_synchronization: Optional[Callable[[bool], None]] = None
         self._on_protection_equipment_triggered: Optional[Callable[[GridElement, str], None]] = None
+        self._on_protection_equipment_cleared: Optional[Callable[[GridElement, str], None]] = None
 
         self._options = {}
 
@@ -64,6 +66,9 @@ class PowerGridModel:
     def set_on_protection_equipment_triggered(self, callback: Optional[Callable[[GridElement, str], None]]):
         self._on_protection_equipment_triggered = callback
 
+    def set_on_protection_equipment_cleared(self, callback: Optional[Callable[[GridElement, str], None]]):
+        self._on_protection_equipment_cleared = callback
+
     def trigger_on_protection_equipment_triggered(self, grid_element: GridElement, protection_name: str):
         if self._on_protection_equipment_triggered is not None:
             try:
@@ -71,8 +76,18 @@ class PowerGridModel:
             except Exception as e:
                 warnings.warn(f"Error during protection equipment trigger callback: {e=}")
 
+    def trigger_on_protection_equipment_cleared(self, grid_element: GridElement, protection_name: str):
+        if self._on_protection_equipment_cleared is not None:
+            try:
+                self._on_protection_equipment_cleared(grid_element, protection_name)
+            except Exception as e:
+                warnings.warn(f"Error during protection equipment cleared callback: {e=}")
+
     def simulate(self) -> bool:
         raise NotImplementedError()
+
+    def prepare_simulator(self, **kwargs):
+        pass
 
     def estimate(self, **kwargs) -> bool:
         """
@@ -84,7 +99,8 @@ class PowerGridModel:
         return {
             "kwargs": self._kwargs,
             "elements": self.elements.copy(),
-            "profiles": self.profiles
+            "profiles": self.profiles,
+            "options": self._options
         }
 
     def clone(self, clone_base: Optional['PowerGridModel'] = None) -> 'PowerGridModel':
@@ -120,6 +136,7 @@ class PowerGridModel:
 
     def from_primitive_dict(self, power_grid_dict: dict):
         self._kwargs = power_grid_dict.get("kwargs", {})
+        self._options = power_grid_dict.get("options", {})
         self.profiles = power_grid_dict.get("profiles", {})
         self.elements = {}
         primitive_dicts = {}
@@ -167,6 +184,7 @@ class PowerGridModel:
         self.elements = dict_representation["elements"]
         self.profiles = dict_representation.get("profiles", {})
         self._kwargs = dict_representation["kwargs"]
+        self._options = dict_representation.get("options", {})
 
     def from_external(self, external_model: Any):
         raise NotImplementedError()
@@ -189,6 +207,15 @@ class PowerGridModel:
     @staticmethod
     def annotator_elements():
         return ["switch"]
+
+    def get_assets(self, bus: Bus) -> List[GridAsset]:
+        assets = []
+        for asset_type in self.asset_elements():
+            asset: GridAsset
+            for asset in self.get_elements_by_type(asset_type):
+                if asset.get_bus() == bus:
+                    assets.append(asset)
+        return assets
 
     def get_annotators(self, grid_element: Union[GridEdge, Bus]):
         """
@@ -283,13 +310,47 @@ class PowerGridModel:
             edges.extend(list(self.elements.get(e_type, {}).values()))
         return edges
 
-    def to_nx_graph(self, with_layout: bool = True, **kwargs):
+    def get_line(self, bus_a: Bus, bus_b: Bus) -> Optional[Union[Line, DcLine]]:
+        for line in self.get_lines():
+            if set(line.get_buses()) == {bus_a, bus_b}:
+                return line
+        return None
+
+    def has_line(self, bus_a: Bus, bus_b: Bus) -> bool:
+        return self.get_line(bus_a, bus_b) is not None
+
+    def to_nx_graph(self, with_layout: bool = True, use_geo_position: bool = False, **kwargs):
         graph = nx.Graph()
         # Add every grid element as node
+        fixed_nodes = set()
         for e_type, elements in self.elements.items():
             elem: GridElement
             for index, elem in self.elements.get(e_type, {}).items():
                 graph.add_nodes_from([(elem.get_identifier(), {"element": elem, "e_type": e_type})])
+                # If specifified, set element positions based on buses
+                if use_geo_position:
+                    buses = elem.get_buses()
+                    if len(buses) == 1:
+                        bus = buses[0]
+                        position = bus.get_property_value("geo_position", (0, 0))
+                        if position is None:
+                            position = (0, 0)
+                        graph.nodes[elem.get_identifier()]["pos"] = position
+                        if isinstance(elem, Bus):
+                            fixed_nodes.add(elem.get_identifier())
+                    elif len(buses) > 1:
+                        # Use center
+                        positions = []
+                        for bus in buses:
+                            position = bus.get_property_value("geo_position")
+                            if position is None:
+                                continue
+                            positions.append(position)
+                        if len(positions) > 0:
+                            multi_point = MultiPoint(positions)
+                            centroid = (multi_point.centroid.x, multi_point.centroid.y)
+                            graph.nodes[elem.get_identifier()]["pos"] = centroid
+                            fixed_nodes.add(elem.get_identifier())
 
         for e_type in self.edge_elements():
             for index, elem in self.elements.get(e_type, {}).items():
@@ -339,8 +400,26 @@ class PowerGridModel:
                 props["color"] = "#1f78b4"
 
         if with_layout:
-            graph = self.layout_graph(graph, **kwargs)
+            if use_geo_position:
+                graph = self.geo_layout_graph(graph, fixed_nodes=fixed_nodes)
+            else:
+                graph = self.layout_graph(graph, **kwargs)
 
+        return graph
+
+    def geo_layout_graph(self, graph, fixed_nodes=None):
+        """
+        Uses a spring layout to calculate the geographical layout based on fixed bus positions.
+        :param graph:
+        :return:
+        """
+        if fixed_nodes is None:
+            fixed = [bus.get_identifier() for bus in self.get_buses()]
+        else:
+            fixed = list(fixed_nodes)
+        pos = {n: graph.nodes[n]["pos"] for n in graph.nodes}
+        k = 1 / (2 * len(graph.nodes))
+        nx.spring_layout(graph, fixed=fixed, store_pos_as="pos", pos=pos)
         return graph
 
     def layout_graph(self, graph, y_factor: float = 3, y_reverse: bool = True):

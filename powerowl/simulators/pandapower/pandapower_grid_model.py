@@ -12,6 +12,7 @@ import numpy as np
 import pandapower as pp
 import pandas
 import pandas as pd
+from numba import typeof
 
 from powerowl.layers.powergrid.elements import *
 from powerowl.layers.powergrid.elements.enums.bus_type import BusType
@@ -33,6 +34,7 @@ from powerowl.layers.powergrid.values.grid_value_type import Step
 from powerowl.layers.powergrid.values.units.scale import Scale
 from powerowl.layers.powergrid.values.units.unit import Unit
 from powerowl.exceptions import ConversionError
+from powerowl.performance.timing import Timing
 from powerowl.simulators.pandapower.processors.processor import Processor
 from powerowl.simulators.pandapower.processors.processor_return_action import ProcessorReturnAction
 from powerowl.simulators.pandapower.processors.protection_processor import ProtectionProcessor
@@ -77,14 +79,14 @@ class PandaPowerGridModel(PowerGridModel):
     def simulate(self, passed_time: Optional[float] = None) -> bool:
         if self._pp_net is None:
             self.prepare_simulator()
-            self._enable_measurement_read_from_pandapower = True
+        self._enable_measurement_read_from_pandapower = True
 
         self._apply_pre_sim_processing(self._get_time_since_last_pre_sim_processing(passed_time))
         self._last_pre_sim = time.time()
         with self._pp_lock:
             sim_net = copy.deepcopy(self._pp_net)
             # Apply Pre-Sim noise
-            if self._post_sim_noise_callback is not None:
+            if self._pre_sim_noise_callback is not None:
                 for table in pp.toolbox.pp_elements(other_elements=True, res_elements=False):
                     if not table.startswith("res_") and isinstance(sim_net[table], pd.DataFrame):
                         sim_net[table] = sim_net[table].apply(self._pp_pre_sim_noise, axis=1, result_type="expand", table=table)
@@ -139,6 +141,7 @@ class PandaPowerGridModel(PowerGridModel):
             for column in row.keys():
                 value = row[column]
                 grid_value = self.get_grid_value_by_pandapower_path(table, index, column)
+
                 if grid_value is not None:
                     unit, scale = self.extract_unit_and_scale(column)
                     if scale is not None and scale != Scale.NONE:
@@ -155,7 +158,7 @@ class PandaPowerGridModel(PowerGridModel):
     def is_prepared(self) -> bool:
         return self._pp_net is not None
 
-    def prepare_simulator(self):
+    def prepare_simulator(self, **kwargs):
         if self.get_option("enable_storage_processing", True):
             self._processors.append(StorageProcessor())
         if self.get_option("enable_protection_emulation", False):
@@ -580,8 +583,9 @@ class PandaPowerGridModel(PowerGridModel):
         builder = self.builder
 
         if "profiles" in net:
-            self.profiles = {}
-            self._load_profiles(net)
+            with Timing("Power Profiles"):
+                self.profiles = {}
+                self._load_profiles(net)
 
         # Bus
         PandaPowerGridModel._to_wattson_elem(net, 'bus', Bus, builder)
@@ -672,6 +676,16 @@ class PandaPowerGridModel(PowerGridModel):
             PandaPowerGridModel._translate_attribute(attribute_name, attribute, element, net, attributes)
         if prefix == "switch" and "in_service" in attributes:
             del attributes["in_service"]
+        if "coords" in attributes:
+            del attributes["coords"]
+        if "geo" not in attributes:
+            attributes["geo"] = None
+        if isinstance(attributes["geo"], list):
+            attributes["geo"] = tuple(attributes["geo"])
+        # Somehow pandapower wants the key "geodata" to fill in the "geo" column...
+        attributes["geodata"] = attributes["geo"]
+        del attributes["geo"]
+        attributes["index"] = index
         pandapower_method(net, **attributes)
 
     @staticmethod
@@ -742,7 +756,7 @@ class PandaPowerGridModel(PowerGridModel):
                             if "coords" in net.bus_geodata.columns:
                                 element_pp_data["coords"] = net.bus_geodata.at[i, "coords"]
                             if "x" in net.bus_geodata.columns and "y" in net.bus_geodata.columns:
-                                element_pp_data["geodata"] = (net.bus_geodata.at[i, "x"], net.bus_geodata.at[i, "y"])
+                                element_pp_data["geo"] = (net.bus_geodata.at[i, "x"], net.bus_geodata.at[i, "y"])
 
                 cols = list(element_pp_data.keys())
 
@@ -776,12 +790,28 @@ class PandaPowerGridModel(PowerGridModel):
                         continue
 
                     val = element_pp_data[col]
+
                     if isinstance(a.value_type, type) and issubclass(a.value_type, enum.Enum):
                         val = PandaPowerGridModel.translate_value_to_enum(cls.prefix, col, val)
                     if name.endswith("bus"):
                         # Get bus
                         bus_id = element_pp_data[col]
                         val = builder.get_element("bus", bus_id)
+
+                    if name == "geo_position":
+                        # Try to handle geo data
+                        if isinstance(val, str):
+                            # Try JSON
+                            try:
+                                import json
+                                geo_data = json.loads(val)
+                                geo_type = geo_data.get("type", "Point").lower()
+                                if geo_type == "point" and "coordinates" in geo_data:
+                                    val = geo_data["coordinates"]
+                            except:
+                                PandaPowerGridModel.warn(f"Could not handle geo_position for {name}: {val}")
+                        else:
+                            PandaPowerGridModel.warn(f"Could not handle geo_position for {name}: {val} (type {typeof(val)})")
 
                     grid_value.set_value(val, None, scale)
                     config[name] = grid_value
@@ -1047,13 +1077,13 @@ class PandaPowerGridModel(PowerGridModel):
         if indicator == "ka":
             return Unit.AMPERE, Scale.KILO
         if indicator == "degree":
-            return Unit.DEGREE, Scale.NONE
+            return Unit.DEGREE, Scale.BASE
         if indicator == "km":
             return Unit.METER, Scale.KILO
         if indicator == "pu":
-            return Unit.PER_UNIT, Scale.NONE
+            return Unit.PER_UNIT, Scale.BASE
         if indicator == "percent":
-            return Unit.PERCENT, Scale.NONE
+            return Unit.PERCENT, Scale.BASE
         return Unit.NONE, Scale.NONE
 
     @staticmethod
@@ -1067,8 +1097,10 @@ class PandaPowerGridModel(PowerGridModel):
             "connection_type": "type",
             "element": "element",
             "zone": "zone",
+            "role": False,
             "position": "coords",
-            "geo_position": "geodata",
+            "position-sequence": "geodata",
+            "geo_position": "geo",
 
             "nominal_power": "sn_mva",
 

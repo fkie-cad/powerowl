@@ -4,7 +4,6 @@ import numpy as np
 
 from .attribute_specification import AttributeSpecification as As
 from .enums.generator_type import GeneratorType
-from .enums.reactive_power_mode import ReactivePowerMode
 from .grid_asset import GridAsset
 from .grid_node import GridNode
 from .transformer import Transformer
@@ -51,14 +50,14 @@ class Generator(GridAsset):
 
             As("target_active_power_percentage", Gvc.CONFIGURATION, float, 100, Unit.PERCENT, Scale.BASE, lower_bound=0, upper_bound=100),
             As("target_voltage", Gvc.CONFIGURATION, float, None, Unit.PER_UNIT, required=False, related=[(Gvc.MEASUREMENT, "voltage")]),
-            As("target_active_power", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
+            As("target_active_power", Gvc.CONFIGURATION, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
 
             As("is_connected", Gvc.MEASUREMENT, bool, True, simulation_context=False, related=[(Gvc.CONFIGURATION, "connected")]),
-            As("cos_phi", Gvc.MEASUREMENT, float, np.NAN, Unit.NONE, Scale.BASE, simulation_context=False),
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE),
-            As("voltage", Gvc.MEASUREMENT, float, np.NAN, Unit.PER_UNIT, related=[(Gvc.CONFIGURATION, "target_voltage")]),
-            As("voltage_angle", Gvc.MEASUREMENT, float, np.NAN, Unit.DEGREE),
+            As("cos_phi", Gvc.MEASUREMENT, float, np.nan, Unit.NONE, Scale.BASE, simulation_context=False),
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE),
+            As("voltage", Gvc.MEASUREMENT, float, np.nan, Unit.PER_UNIT, related=[(Gvc.CONFIGURATION, "target_voltage")]),
+            As("voltage_angle", Gvc.MEASUREMENT, float, np.nan, Unit.DEGREE),
 
             As("profile_percentage", Gvc.MEASUREMENT, float, 100, Unit.PERCENT, Scale.BASE, source=(Gvc.CONFIGURATION, "active_power_profile_percentage"))
         ]

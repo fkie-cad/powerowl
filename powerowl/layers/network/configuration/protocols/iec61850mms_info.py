@@ -1,7 +1,9 @@
 from typing import Type, TYPE_CHECKING, List, Optional
 
+from powerowl.layers.network.configuration.data_point_type import DataPointType
 from powerowl.layers.network.configuration.data_point_value import DataPointValue
 from powerowl.layers.network.configuration.protocols.iec61850.mms_data_attribute import MMSDataAttribute
+from powerowl.layers.network.configuration.protocols.iec61850.mms_data_set import MMSDataSet
 from powerowl.layers.network.configuration.protocols.iec61850.mms_functional_constraints import MMSFunctionalConstraints
 from powerowl.layers.network.configuration.protocols.iec61850.mms_report_control_block import MMSReportControlBlock
 from powerowl.layers.network.configuration.protocols.iec61850.mms_trigger_options import MMSTriggerOptions
@@ -9,12 +11,9 @@ from powerowl.layers.network.configuration.protocols.protocol_info import Protoc
 from powerowl.layers.network.configuration.protocols.protocol_name import ProtocolName
 from powerowl.layers.powergrid.values.grid_value_type import Step
 
-
 if TYPE_CHECKING:
     from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
-    from powerowl.layers.network.configuration.protocols.iec61850.mms_model import MMSModel
-    from powerowl.layers.network.configuration.protocols.iec61850.mms_logical_device import MMSLogicalDevice
-    from powerowl.layers.network.configuration.protocols.iec61850.mms_logical_node import MMSLogicalNode
+    from powerowl.layers.network.rtu import RTU
 
 
 class IEC61850MMSInfo(ProtocolInfo):
@@ -23,13 +22,12 @@ class IEC61850MMSInfo(ProtocolInfo):
         self.mms_attribute: Optional[MMSDataAttribute] = None
         self.attribute_identifier: str = "NONE"
 
-        self.server: int = -1
         self.type: str = "NONE"
         self.network_node: Optional = None
-        self.functional_constraints: MMSFunctionalConstraints = MMSFunctionalConstraints.NONE
+        self.functional_constraint: MMSFunctionalConstraints = MMSFunctionalConstraints.NONE
         self.trigger_options: List[MMSTriggerOptions] = []
-        self.report_control_blocks: List[MMSReportControlBlock] = []
         self._direction: str = "monitoring"
+        self.is_primary_attribute: bool = False
 
     @property
     def direction(self):
@@ -52,29 +50,48 @@ class IEC61850MMSInfo(ProtocolInfo):
         self.attribute_identifier = d["attribute_identifier"]
         self.server = d["server"]
         self.type = d["type"]
-        self.functional_constraints = d["functional_constraints"]
-        # TODO
-        self.trigger_options = []
-        # TODO
-        self.report_control_blocks = []
+        self.functional_constraint = d["functional_constraint"]
 
     def get_protocol_data_dict(self, as_primitive: bool = False) -> dict:
         return {
-            "attribute_identifier": self.attribute_identifier,
+            "attribute_identifier": self.mms_attribute.name,
+            "initial_value": self.mms_attribute.initial_value,
+            "is_primary_attribute": self.is_primary_attribute,
             "model": self.mms_attribute.get_mms_model().name,
             "logical_device": self.mms_attribute.get_mms_logical_device().name,
             "logical_node": self.mms_attribute.get_mms_logical_node().name,
-            "data_object": self.mms_attribute.get_mms_data_object().name,
+            # All (recursive) data objects
+            "data_objects": [
+                parent_object.name for parent_object in self.mms_attribute.get_parent_data_objects()
+            ],
+            # Potential parent attributes
+            "data_attributes": [
+                parent_attribute.name for parent_attribute in self.mms_attribute.get_parent_data_attributes()
+            ],
             "mms_path": self.mms_attribute.get_mms_path(),
-
-            "server": self.server,
+            "server": self.get_server().coa,
             "direction": self.direction,
             "type": self.type,
-            "functional_constraints": self.functional_constraints.value,
+            "functional_constraint": self.functional_constraint.value,
             "trigger_options": [option.value for option in self.trigger_options],
-            # TODO:
-            "report_control_blocks": [],
+            "report_control_blocks": [
+                f"$ref${DataPointType.REPORT_CONTROL_BLOCK_61850.value}${report_control_block.data_point_id}"
+                for report_control_block in self.get_report_control_blocks()
+            ],
+            "data_sets": [
+                f"$ref${DataPointType.DATA_SET_61850.value}${data_set.data_point_id}"
+                for data_set in self.get_data_sets()
+            ]
         }
+
+    def get_report_control_blocks(self) -> List[MMSReportControlBlock]:
+        return self.mms_attribute.get_report_control_blocks()
+
+    def get_data_sets(self) -> List[MMSDataSet]:
+        return self.mms_attribute.get_data_sets()
+
+    def get_server(self) -> 'RTU':
+        return self.mms_attribute.get_server()
 
     def generate_data_point_id(self):
         if self.mms_attribute is None:
@@ -109,14 +126,14 @@ class IEC61850MMSInfo(ProtocolInfo):
             self.type = "INT32"
         return False
 
-    def derive_functional_constraints(self) -> bool:
+    def derive_functional_constraint(self) -> bool:
         if self.direction == "monitoring":
-            self.functional_constraints = MMSFunctionalConstraints.PROCESS_VALUE_MEASURAND_MX
+            self.functional_constraint = MMSFunctionalConstraints.PROCESS_VALUE_MEASURAND_MX
         else:
             if self.type == "BOOLEAN":
-                self.functional_constraints = MMSFunctionalConstraints.PROCESS_COMMAND_BINARY_CO
+                self.functional_constraint = MMSFunctionalConstraints.PROCESS_COMMAND_BINARY_CO
             else:
-                self.functional_constraints = MMSFunctionalConstraints.PROCESS_COMMAND_ANALOG_SP
+                self.functional_constraint = MMSFunctionalConstraints.PROCESS_COMMAND_ANALOG_SP
         return True
 
     def derive_trigger_options(self) -> bool:
@@ -125,14 +142,19 @@ class IEC61850MMSInfo(ProtocolInfo):
             # pass
             return True
 
-        if self.type in [17, 38]:
+        if self.type in ["PROTECTION"]:
             # Protection event
             # self.trigger_options.append()
             return True
 
-        if self.type in [9, 11, 13]:
-            # self.trigger_options.append(MMSTriggerOptions.DATA_CHANGED)
+        if self.type in ["FLOAT32"]:
+            self.trigger_options.append(MMSTriggerOptions.INTEGRITY)
             return True
 
-        self.trigger_options.append(MMSTriggerOptions.DATA_CHANGED)
+        if self.type in ["INT32", "BOOLEAN"]:
+            self.trigger_options.append(MMSTriggerOptions.DATA_CHANGED)
+
         return True
+
+    def _translate_report_control_block(self, report_control_block: MMSReportControlBlock) -> dict:
+        return report_control_block.to_data_point_dict(as_primitive=True)

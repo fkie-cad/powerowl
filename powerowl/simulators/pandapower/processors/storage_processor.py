@@ -12,6 +12,15 @@ if TYPE_CHECKING:
 
 
 class StorageProcessor(Processor):
+    def __init__(self):
+        super().__init__()
+        self._warning_cache = set()
+
+    def warn(self, message: str):
+        if message not in self._warning_cache:
+            warnings.warn(message)
+            self._warning_cache.add(message)
+
     def apply_pre_simulation_processing(self, grid_model: 'PandaPowerGridModel', simulation_step_interval: Optional[float] = None):
         if simulation_step_interval is None or simulation_step_interval == 0:
             return
@@ -43,7 +52,7 @@ class StorageProcessor(Processor):
             # Potentially limit charge
             new_charge_wh = max(minimum_charge_wh, new_charge_wh)
             if maximum_charge_wh is None or np.isnan(maximum_charge_wh) or maximum_charge_wh == 0:
-                warnings.warn(f"No capacity / maximum charge given for {storage.get_identifier()}")
+                self.warn(f"No capacity / maximum charge given for {storage.get_identifier()}")
             else:
                 new_charge_wh = min(maximum_charge_wh, new_charge_wh)
                 charge_percentage = (new_charge_wh / maximum_charge_wh) * 100

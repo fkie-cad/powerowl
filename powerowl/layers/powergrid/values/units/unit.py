@@ -32,3 +32,8 @@ class Unit(enum.Enum):
             Unit.FARAD: "F",
             Unit.WATT_HOUR: "Wh"
         }.get(self, "???")
+
+    def get_name(self):
+        if self == Unit.NONE:
+            return ""
+        return self.value

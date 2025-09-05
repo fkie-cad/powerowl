@@ -7,7 +7,6 @@ from powerowl.layers.network.configuration.providers.modbus_types import ModbusT
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
 from powerowl.layers.network.configuration.providers.provider_name import ProviderName
 from powerowl.layers.network.field_device import FieldDevice
-from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
 
 
 class ModbusTCPProviderInfo(ProviderInfo):

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from powerowl.exceptions.grid_element_already_exists_exception import GridElementAlreadyExistsException
+
 from .elements import Bus, Line
 from .elements.grid_element import GridElement
 

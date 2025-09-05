@@ -1,11 +1,12 @@
-import abc
 import enum
 import time
 import traceback
 import warnings
 from typing import Optional, Any, Dict, Callable, TYPE_CHECKING, List, Tuple, Union
 
+import numpy as np
 from powerowl.exceptions.grid_value_error import GridValueError
+
 from .grid_value_context import GridValueContext
 from .grid_value_type import GridValueType
 from .units.scale import Scale
@@ -193,6 +194,28 @@ class GridValue:
         if target_scale != Scale.NONE:
             value = target_scale.from_scale(value, self.scale)
         return value
+
+    @staticmethod
+    def _numpy_extract(obj):
+        if type(obj) in (bool, str, int, float, type(None)):
+            return obj
+
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return [GridValue._numpy_extract(entry) for entry in obj.tolist()]
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        return None
+
+    def get_native_value(self) -> Any:
+        """
+        @return: The result from get_value but as native Python value
+        """
+        obj = self.get_value()
+        return GridValue._numpy_extract(obj)
 
     def get_grid_element(self) -> Optional['GridElement']:
         return self._grid_element

@@ -44,7 +44,9 @@ class GraphLayer:
         base = 0 if self.parent is None else self.parent.z
         return base + self.z_offset
 
-    def get_layer_graph(self, include_sub_layers: bool = True, edge_type_filter: Optional[Set[EdgeType]] = None) -> nx.Graph:
+    def get_layer_graph(self, include_sub_layers: bool = True,
+                        edge_type_filter: Optional[Set[EdgeType]] = None,
+                        node_class_filter: Optional[Set[Type[ModelNode]]] = None) -> nx.Graph:
         """
         From the Multi Layer Graph, this method calculates a one-layered graph containing only nodes and edges from
         this layer. If specified, sub-layers are included as well.
@@ -56,7 +58,7 @@ class GraphLayer:
         if include_sub_layers:
             allowed_layers.union(self.get_sub_layers())
         # Use the MultiLayerGraph to calculate the subgraph
-        return self.mlg.get_subgraph_of_layers(allowed_layers, edge_type_filter=edge_type_filter)
+        return self.mlg.get_subgraph_of_layers(allowed_layers, edge_type_filter=edge_type_filter, node_class_filter=node_class_filter)
 
     def get_lower_layer(self) -> Optional['GraphLayer']:
         layers = self.mlg.get_layers()
@@ -152,7 +154,7 @@ class GraphLayer:
                  edge_type: EdgeType = EdgeType.DEFAULT):
         node_a = self.mlg.get_model_node(node_a)
         node_b = self.mlg.get_model_node(node_b)
-        edge = ModelEdge(node_a=node_a, node_b=node_b, edge_type=edge_type)
+        edge = ModelEdge(node_a=node_a, node_b=node_b, edge_types=[edge_type])
         return self.mlg.add_edge(edge)
 
     def __str__(self):

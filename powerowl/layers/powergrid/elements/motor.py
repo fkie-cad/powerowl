@@ -25,17 +25,17 @@ class Motor(GridAsset):
             As("bus", Gvc.PROPERTY, GridNode, None),
             As("rated_voltage", Gvc.PROPERTY, float, None, Unit.VOLT, Scale.BASE, required=False),
             As("rated_mechanical_power", Gvc.PROPERTY, float, None, Unit.WATT, Scale.BASE),
-            As("rated_power_efficiency", Gvc.PROPERTY, float, np.NAN, Unit.PERCENT),
-            As("rated_power_cos_phi", Gvc.PROPERTY, float, np.NAN),
-            As("locked_rotor_current", Gvc.PROPERTY, float, np.NAN, Unit.PER_UNIT),
+            As("rated_power_efficiency", Gvc.PROPERTY, float, np.nan, Unit.PERCENT),
+            As("rated_power_cos_phi", Gvc.PROPERTY, float, np.nan),
+            As("locked_rotor_current", Gvc.PROPERTY, float, np.nan, Unit.PER_UNIT),
             As("controllable", Gvc.PROPERTY, bool, True),
 
-            As("cos_phi", Gvc.CONFIGURATION, float, np.NAN),
+            As("cos_phi", Gvc.CONFIGURATION, float, np.nan),
             As("efficiency", Gvc.CONFIGURATION, float, 100, Unit.PERCENT),
             As("loading", Gvc.CONFIGURATION, float, 100, Unit.PERCENT),
             As("scaling", Gvc.CONFIGURATION, float, 1),
             As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE)
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE)
         ]

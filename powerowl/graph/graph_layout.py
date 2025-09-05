@@ -310,8 +310,13 @@ class GraphLayout:
             if trace_name not in sub_traces:
                 sub_traces[trace_name] = copy.deepcopy(default_trace)
             t = sub_traces[trace_name]
-            t["e_colors"].extend([il_edge.edge_type.get_color()] * 3)
-            t["e_labels"].extend([il_edge.edge_type.value] * 3)
+            try:
+                t["e_colors"].extend([il_edge.edge_type.get_color()] * 3)
+                t["e_labels"].extend([il_edge.edge_type.value] * 3)
+            except Exception as e:
+                print(repr(il_edge.edge_types))
+                print(repr(il_edge.edge_type))
+                raise e
             node_a = il_edge.node_a
             node_b = il_edge.node_b
             t["xe"].extend([node_a.pos3d.x, node_b.pos3d.x, None])
@@ -533,8 +538,8 @@ class GraphLayout:
                 if self.mlg.has_edge(neighbor_a, neighbor_b):
                     continue
                 edge_a = self.mlg.get_edge(model_node, neighbor_a)
-                temporary_type = edge_a.edge_type if edge_type is None else edge_type
-                temporary_edge = ModelEdge(neighbor_a, neighbor_b, edge_type=temporary_type)
+                temporary_types = edge_a.edge_types if edge_type is None else [edge_type]
+                temporary_edge = ModelEdge(neighbor_a, neighbor_b, edge_types=temporary_types)
                 self.mlg.add_edge(temporary_edge)
                 self._temporary_edges.add(temporary_edge)
 

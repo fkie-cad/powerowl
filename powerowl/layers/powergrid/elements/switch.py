@@ -1,7 +1,6 @@
-from typing import List, Union
+from typing import List
 
 import numpy as np
-from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
 
 from . import GridElement
 from .attribute_specification import AttributeSpecification as As
@@ -32,7 +31,7 @@ class Switch(GridAnnotator):
             As("bus", Gvc.PROPERTY, GridNode, None),
             As("element", Gvc.PROPERTY, GridElement, None),
             As("type", Gvc.PROPERTY, SwitchType, SwitchType.NONE),
-            As("maximum_current", Gvc.PROPERTY, float, np.NAN, Unit.AMPERE, Scale.BASE, required=False),
+            As("maximum_current", Gvc.PROPERTY, float, np.nan, Unit.AMPERE, Scale.BASE, required=False),
 
             As("in_service", Gvc.CONFIGURATION, bool, True, required=False, operator_controllable=False, simulation_context=False),
             As("closed", Gvc.CONFIGURATION, bool, True, related=[(Gvc.MEASUREMENT, "is_closed")]),

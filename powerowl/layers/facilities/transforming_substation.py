@@ -1,5 +1,3 @@
-import dataclasses
-
 from .substation import Substation
 
 

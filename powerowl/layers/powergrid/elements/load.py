@@ -4,7 +4,6 @@ import numpy as np
 
 from .attribute_specification import AttributeSpecification as As
 from .enums.connection_type import ConnectionType
-from .enums.voltage_niveau import VoltageNiveau
 from .grid_asset import GridAsset
 from .grid_node import GridNode
 from ..values.grid_value_context import GridValueContext as Gvc
@@ -45,11 +44,11 @@ class Load(GridAsset):
             As("connected", Gvc.CONFIGURATION, bool, True, related=[(Gvc.MEASUREMENT, "is_connected")], targets=[(Gvc.MEASUREMENT, "is_connected")]),
             As("scaling", Gvc.CONFIGURATION, float, 1),
             As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
-            As("target_active_power", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
-            As("target_reactive_power", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
+            As("target_active_power", Gvc.CONFIGURATION, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
+            As("target_reactive_power", Gvc.CONFIGURATION, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
 
             As("is_connected", Gvc.MEASUREMENT, bool, True, simulation_context=False, source=(Gvc.CONFIGURATION, "connected")),
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")])
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")])
         ]
 

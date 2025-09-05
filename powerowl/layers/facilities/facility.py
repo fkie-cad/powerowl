@@ -1,6 +1,7 @@
 import dataclasses
 from typing import TYPE_CHECKING, Optional
 
+from powerowl.graph.enums.owner import Owner
 from powerowl.graph.model_node import ModelNode
 
 if TYPE_CHECKING:
@@ -10,6 +11,7 @@ if TYPE_CHECKING:
 @dataclasses.dataclass(eq=False, kw_only=True)
 class Facility(ModelNode):
     readable_name: Optional[str] = None
+    owner: Owner = Owner.NONE
 
     def derive_ict(self, owl: 'PowerOwl'):
         pass

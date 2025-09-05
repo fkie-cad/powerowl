@@ -1,5 +1,5 @@
 import enum
-from typing import Tuple, Any, Callable, List, Type, Dict
+from typing import Tuple, Any, Type, Dict
 
 from powerowl.layers.powergrid.values.units.scale import Scale
 from powerowl.layers.powergrid.values.units.unit import Unit

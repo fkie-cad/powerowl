@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 
 from .attribute_specification import AttributeSpecification as As
-from .enums.connection_type import ConnectionType
 from .enums.reactive_power_mode import ReactivePowerMode
 from .enums.static_generator_type import StaticGeneratorType
 from .enums.voltage_niveau import VoltageNiveau
@@ -56,13 +55,13 @@ class StaticGenerator(GridAsset):
 
             As("target_cos_phi", Gvc.CONFIGURATION, float, None, simulation_context=False, lower_bound=0, upper_bound=1),
             As("target_active_power_percentage", Gvc.CONFIGURATION, float, 100, Unit.PERCENT, Scale.BASE, lower_bound=0, upper_bound=100),
-            As("target_active_power", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
-            As("target_reactive_power", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
+            As("target_active_power", Gvc.CONFIGURATION, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
+            As("target_reactive_power", Gvc.CONFIGURATION, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
 
             As("is_connected", Gvc.MEASUREMENT, bool, True, simulation_context=False, source=(Gvc.CONFIGURATION, "connected")),
-            As("cos_phi", Gvc.MEASUREMENT, float, np.NAN, Unit.NONE, Scale.BASE, simulation_context=False, related=[(Gvc.CONFIGURATION, "target_cos_phi")]),
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")]),
+            As("cos_phi", Gvc.MEASUREMENT, float, np.nan, Unit.NONE, Scale.BASE, simulation_context=False, related=[(Gvc.CONFIGURATION, "target_cos_phi")]),
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_active_power")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "target_reactive_power")]),
 
             As("profile_percentage", Gvc.MEASUREMENT, float, 100, Unit.PERCENT, Scale.BASE, source=(Gvc.CONFIGURATION, "active_power_profile_percentage"))
         ]

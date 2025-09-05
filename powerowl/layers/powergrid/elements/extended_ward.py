@@ -24,17 +24,17 @@ class ExtendedWard(GridAsset):
 
             As("bus", Gvc.PROPERTY, GridNode, None),
             As("controllable", Gvc.PROPERTY, bool, True),
-            As("resistance", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
-            As("reactance", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
+            As("resistance", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
+            As("reactance", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
             As("controllable", Gvc.PROPERTY, bool, True),
-            As("impedance_active_power_demand", Gvc.PROPERTY, float, np.NAN, Unit.WATT, Scale.BASE),
-            As("impedance_reactive_power_demand", Gvc.PROPERTY, float, np.NAN, Unit.VAR, Scale.BASE),
+            As("impedance_active_power_demand", Gvc.PROPERTY, float, np.nan, Unit.WATT, Scale.BASE),
+            As("impedance_reactive_power_demand", Gvc.PROPERTY, float, np.nan, Unit.VAR, Scale.BASE),
 
-            As("target_voltage", Gvc.CONFIGURATION, float, np.NAN, Unit.PER_UNIT, related=[(Gvc.MEASUREMENT, "voltage")]),
-            As("active_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
-            As("reactive_power_demand", Gvc.CONFIGURATION, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
+            As("target_voltage", Gvc.CONFIGURATION, float, np.nan, Unit.PER_UNIT, related=[(Gvc.MEASUREMENT, "voltage")]),
+            As("active_power_demand", Gvc.CONFIGURATION, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.MEASUREMENT, "active_power")]),
+            As("reactive_power_demand", Gvc.CONFIGURATION, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.MEASUREMENT, "reactive_power")]),
 
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "active_power_demand")]),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "reactive_power_demand")]),
-            As("voltage", Gvc.MEASUREMENT, float, np.NAN, Unit.PER_UNIT, related=[(Gvc.CONFIGURATION, "target_voltage")])
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE, related=[(Gvc.CONFIGURATION, "active_power_demand")]),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE, related=[(Gvc.CONFIGURATION, "reactive_power_demand")]),
+            As("voltage", Gvc.MEASUREMENT, float, np.nan, Unit.PER_UNIT, related=[(Gvc.CONFIGURATION, "target_voltage")])
         ]

@@ -35,9 +35,9 @@ class ExternalGrid(GridAsset):
             As("maximum_zero_sequence_x0x_ratio", Gvc.PROPERTY, float, None, required=False),
 
             As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
-            As("target_voltage", Gvc.CONFIGURATION, float, np.NAN, Unit.PER_UNIT),
-            As("target_voltage_angle", Gvc.CONFIGURATION, float, np.NAN, Unit.DEGREE, Scale.BASE),
+            As("target_voltage", Gvc.CONFIGURATION, float, np.nan, Unit.PER_UNIT),
+            As("target_voltage_angle", Gvc.CONFIGURATION, float, np.nan, Unit.DEGREE, Scale.BASE),
 
-            As("active_power", Gvc.MEASUREMENT, float, np.NAN, Unit.WATT, Scale.BASE),
-            As("reactive_power", Gvc.MEASUREMENT, float, np.NAN, Unit.VAR, Scale.BASE)
+            As("active_power", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE),
+            As("reactive_power", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE)
         ]

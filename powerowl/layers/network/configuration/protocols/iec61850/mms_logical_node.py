@@ -1,6 +1,7 @@
+import dataclasses
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from powerowl.exceptions.model_node_not_found_exception import ModelNodeNotFoundException
 from powerowl.graph.model_node import ModelNode
@@ -14,6 +15,9 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class MMSLogicalNode(ModelNode):
+    children: List["MMSDataObject"] = dataclasses.field(default_factory=list)
+    parent: Optional["MMSLogicalDevice"] = None
+
     def get_mms_path(self) -> str:
         return f"{self.get_mms_logical_device().get_mms_path()}/{self.name}"
 
@@ -42,3 +46,8 @@ class MMSLogicalNode(ModelNode):
         for data_object in self.get_mms_data_objects():
             data_attributes.extend(data_object.get_mms_data_attributes())
         return data_attributes
+
+    def add_child(self, child: 'MMSDataObject'):
+        if child not in self.children:
+            self.children.append(child)
+            child.parent = self

@@ -1,11 +1,9 @@
 import dataclasses
 import ipaddress
 import math
-import warnings
 from typing import Optional, Set, Iterator
 
 import networkx as nx
-
 from powerowl.exceptions import DerivationError
 from powerowl.exceptions.subnet_exhausted_error import SubnetExhaustedError
 from powerowl.exceptions.undefined_network_error import UndefinedNetworkError
@@ -15,7 +13,6 @@ from powerowl.graph.model_node import ModelNode
 from powerowl.layers.network.interface import Interface
 from powerowl.layers.network.link import Link
 from powerowl.layers.network.switch import Switch
-from powerowl.performance.timing import Timing
 
 
 @dataclasses.dataclass(eq=False, kw_only=True)

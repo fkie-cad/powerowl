@@ -2,8 +2,11 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List
 
+from powerowl.exceptions import DerivationError
 from powerowl.exceptions.model_node_not_found_exception import ModelNodeNotFoundException
+from powerowl.graph.enums import Layers
 from powerowl.graph.model_node import ModelNode
+from powerowl.layers.network.rtu import RTU
 
 if TYPE_CHECKING:
     from powerowl.layers.network.configuration.protocols.iec61850.mms_model import MMSModel
@@ -19,6 +22,15 @@ class MMSLogicalDevice(ModelNode):
 
     def __hash__(self):
         return hash(self.uid)
+
+    def get_ied_node(self) -> RTU:
+        network_nodes = self.mlg.get_inter_layer_neighbors(self, other_layers={self.mlg.get_layer(Layers.NETWORK)})
+        ieds = [ied for ied in network_nodes if isinstance(ied, RTU)]
+        if len(ieds) == 0:
+            raise ModelNodeNotFoundException(f"No IED for MMSLogicalDevice {self.name}")
+        if len(ieds) > 1:
+            raise DerivationError(f"Multiple IEDs linked to one MMSLogicalDevice {self.name}")
+        return ieds[0]
 
     def get_mms_model(self) -> 'MMSModel':
         from powerowl.layers.network.configuration.protocols.iec61850.mms_model import MMSModel

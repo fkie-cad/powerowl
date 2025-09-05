@@ -9,12 +9,14 @@ class Facilities(str, enum.Enum):
     TRANSFORMING_SUBSTATION = "transforming-substation"
     DISTRIBUTION_SUBSTATION = "distribution-substation"
     JUNCTION_BOX = "junction-box"
+    MUFF = "muff"
     POWER_PLANT = "power-plant"
     SOLAR_POWER_PLANT = "solar-power-plant"
     WIND_POWER_PLANT = "wind-power-plant"
     VIRTUAL_POWER_PLANT = "wind-power-plant"
 
     HOUSEHOLD = "household"
+    OUTDOOR = "outdoor"
 
     GRID_CONNECTION_STATION = "grid-connection-station"
 
@@ -29,6 +31,7 @@ class Facilities(str, enum.Enum):
             Facilities.TRANSFORMING_SUBSTATION: "TSS",
             Facilities.DISTRIBUTION_SUBSTATION: "DSS",
             Facilities.JUNCTION_BOX: "JB",
+            Facilities.MUFF: "Muff",
             Facilities.POWER_PLANT: "PowerP",
             Facilities.SOLAR_POWER_PLANT: "SolarP",
             Facilities.WIND_POWER_PLANT: "WindP",

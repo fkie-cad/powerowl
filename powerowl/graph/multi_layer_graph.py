@@ -1,14 +1,13 @@
 import codecs
 import enum
-import json
 import pickle
 import warnings
 import threading
-from pathlib import Path
 from typing import Optional, Any, Dict, Set, Union, TYPE_CHECKING, List, Callable, Type, overload, Tuple, Iterator
 
 import networkx
 import networkx as nx
+from powerowl.performance.function_performance import measure
 
 from .constants import MODEL_NODE, MODEL_EDGE
 from .enums import EdgeType
@@ -60,13 +59,22 @@ class MultiLayerGraph:
             raise ValueError(f"Layer {layer.name} already exists")
         self._layers[layer.name] = layer
 
-    def merge(self, graph: nx.Graph, layer: Union[str, GraphLayer]):
+    def merge(self, graph: nx.Graph, layer: Union[str, GraphLayer], respect_extension: bool = False):
         """
         Merges the multi layer graph with a given (one-layered) nx.Graph into the given layer.
+        :param graph: The graph to merge from
+        :param layer: The layer to merge into
+        :param respect_extension: If true, will check for existing nodes and edges and exstend the graph acoordingly.
         """
         layer = self.get_layer(layer)
+        name_cache = self.get_node_name_cache(layer)
         node_mapping = {}
         for node_name, node in graph.nodes.items():
+            if respect_extension:
+                node = self.get_node_with_name(node_name, layer, name_cache)
+                if node is not None:
+                    node_mapping[node_name] = node
+                    continue
             model_node = ModelNode(name=node_name, layer=layer)
             for key, value in node.items():
                 model_node.attributes[key] = value
@@ -85,10 +93,12 @@ class MultiLayerGraph:
         for edge in graph.edges.data("type"):
             node_a = node_mapping[edge[0]]
             node_b = node_mapping[edge[1]]
-            edge_type = edge[2]
-            if not isinstance(edge_type, EdgeType):
-                edge_type = EdgeType.DEFAULT
-            model_edge = ModelEdge(node_a=node_a, node_b=node_b, edge_type=edge_type)
+            if respect_extension and self.has_edge(node_a, node_b):
+                continue
+            edge_types = edge[2]
+            if not isinstance(edge_types, list):
+                edge_types = [EdgeType.DEFAULT]
+            model_edge = ModelEdge(node_a=node_a, node_b=node_b, edge_types=edge_types)
             self.add_edge(model_edge=model_edge)
 
     def insert_layer_above(self, existing_layer: Union[GraphLayer, str], name: str,
@@ -144,9 +154,10 @@ class MultiLayerGraph:
         return self._layer_objects.get(layer)
 
     def get_layer_graph(self, layer_name: str, include_sub_layers: bool = True,
-                        edge_type_filter: Optional[Set[EdgeType]] = None) -> nx.Graph:
+                        edge_type_filter: Optional[Set[EdgeType]] = None,
+                        node_class_filter: Optional[Set[Type[ModelNode]]] = None) -> nx.Graph:
         layer = self.get_layer(layer_name)
-        return layer.get_layer_graph(include_sub_layers=include_sub_layers, edge_type_filter=edge_type_filter)
+        return layer.get_layer_graph(include_sub_layers=include_sub_layers, edge_type_filter=edge_type_filter, node_class_filter=node_class_filter)
 
     @staticmethod
     def get_node_name(name: Union[str, enum.Enum]):
@@ -189,14 +200,14 @@ class MultiLayerGraph:
             edge_types = {}
             for neighbor in neighbors:
                 edge = self.get_edge(model_node, neighbor)
-                edge_types[neighbor.id] = edge.edge_type
+                edge_types[neighbor.id] = edge.edge_types
                 self.remove_edge(edge)
             self.remove_node(model_node)
             for i, neighbor_a in enumerate(neighbors):
                 for neighbor_b in neighbors[i+1:]:
                     edge_type_a = edge_types[neighbor_a.id]
                     edge_type_b = edge_types[neighbor_b.id]
-                    if edge_type_a != edge_type_b:
+                    if set(edge_type_a) != set(edge_type_b):
                         warnings.warn(f"Mismatch for edge_types between {neighbor_a.id} ({edge_type_a}) and {neighbor_b.id} ({edge_type_b})")
                     self.build_edge(neighbor_a, neighbor_b, edge_type_a)
 
@@ -214,14 +225,16 @@ class MultiLayerGraph:
             node_b = model_edge.node_b.uid
             return self.graph.add_edges_from([(node_a, node_b, {MODEL_EDGE: model_edge})])
 
+    @measure
     def build_edge(self, node_a: Union[enum.Enum, str, 'ModelNode'], node_b: Union[enum.Enum, str, 'ModelNode'],
-                   edge_type: EdgeType = EdgeType.DEFAULT):
+                   edge_type: EdgeType = EdgeType.DEFAULT) -> ModelEdge:
         edge = ModelEdge(
             node_a=self.get_model_node(node_a),
             node_b=self.get_model_node(node_b),
-            edge_type=edge_type
+            edge_types=[edge_type]
         )
-        return self.add_edge(edge)
+        self.add_edge(edge)
+        return edge
 
     def has_edge(self, node_a, node_b):
         try:
@@ -245,8 +258,17 @@ class MultiLayerGraph:
     def has_path(self,
                  node_a,
                  node_b,
-                 allowed_edge_types: Optional[Union[EdgeType, Set[EdgeType]]] = None
+                 allowed_edge_types: Optional[Union[EdgeType, Set[EdgeType]]] = None,
+                 force_graph: Optional[nx.Graph] = None
                  ) -> bool:
+
+        if force_graph is not None:
+            try:
+                nx.shortest_path(force_graph, node_a.uid, node_b.uid)
+            except networkx.exception.NetworkXNoPath:
+                return False
+            return True
+
         path = self.get_shortest_path(node_a, node_b, allowed_edge_types)
         return path is not None
 
@@ -262,9 +284,9 @@ class MultiLayerGraph:
             # Allow using a single edge type as argument
             if isinstance(allowed_edge_types, EdgeType):
                 allowed_edge_types = {allowed_edge_types}
-            # Select all edges have the wrong type
+            # Select all edges that have the wrong type
             edges_to_remove = [e for e in self.graph.edges(data=True)
-                               if not e[2][MODEL_EDGE].edge_type in allowed_edge_types]
+                               if not e[2][MODEL_EDGE].has_any_type(allowed_edge_types)]
         # Remove edges
         self.graph.remove_edges_from(edges_to_remove)
         try:
@@ -407,7 +429,7 @@ class MultiLayerGraph:
             neighbors = {neighbor for neighbor in neighbors if isinstance(neighbor, tuple(neighbor_instance_filter))}
         if edge_type_filter is not None and len(edge_type_filter) > 0:
             # Apply edge type filter
-            neighbors = {neighbor for neighbor in neighbors if self.get_edge(node, neighbor).edge_type in edge_type_filter}
+            neighbors = {neighbor for neighbor in neighbors if self.get_edge(node, neighbor).has_any_type(edge_type_filter)}
         return neighbors
 
     def layout(self):
@@ -419,8 +441,16 @@ class MultiLayerGraph:
         return self._layout.plotly_figure()
 
     def draw(self, **kwargs):
+        show_options = kwargs.get("show_options", {})
+        show_options["toImageButtonOptions"] = {
+            'format': 'png',  # one of png, svg, jpeg, webp
+            'filename': 'powerowl',
+            'height': 1080,
+            'width': 1920,
+            'scale': 6  # Multiply title/legend/axis/canvas sizes by this factor
+        }
         fig = self.plotly_figure(**kwargs)
-        fig.show()
+        fig.show(config=show_options)
 
     def get_model_node(self, n: Union[str, ModelNode]) -> 'ModelNode':
         if isinstance(n, ModelNode):
@@ -443,18 +473,80 @@ class MultiLayerGraph:
                 edge.node_b = new_model_node
 
     def has_node(self, n: Union[str, ModelNode]) -> bool:
-        uid = self.get_node_uid(n)
+        try:
+            uid = self.get_node_uid(n)
+        except KeyError:
+            return False
         return self.graph.has_node(uid)
 
-    def get_subgraph_of_layers(self, layers: Set['GraphLayer'], edge_type_filter: Optional[Set[EdgeType]] = None) -> nx.Graph:
+    def get_node_name_cache(self, layer: Optional[GraphLayer] = None) -> Dict[str, ModelNode]:
+        if layer is None:
+            nodes = self.get_nodes()
+        else:
+            nodes = self.get_nodes_at_layers({layer})
+        cache = {}
+        for node in nodes:
+            cache[node.name] = node
+        return cache
+
+    def get_node_with_name(self, name: str, layer: Optional['GraphLayer'] = None, name_cache: Optional[dict] = None) -> Optional['ModelNode']:
+        """
+        Returns the (first) node in the MLG with the given name.
+        If the layer is given, only nodes on that layer are considered.
+        :param name: The node name to search
+        :param layer: The layer to search on
+        :param name_cache: Using a name cache speeds up performance for repeated use of this function. This should be a dictionary with name -> ModelNode.
+        :return: The node with the given name, or None if not found
+        """
+        if name_cache is not None:
+            node = name_cache.get(name)
+            if node is None:
+                return None
+            if layer is not None and node.layer != layer:
+                return None
+            return node
+
+        for node in self.get_nodes():
+            if node.name == name:
+                if layer is not None:
+                    if node.layer == layer:
+                        return node
+                else:
+                    return node
+        return None
+
+    def has_node_with_name(self, name: str, layer: Optional[GraphLayer] = None) -> bool:
+        """
+        Returns whether the MLG has a node with the given name.
+        If the layer is given, only nodes on that layer are considered.
+        :param name: The node name to search
+        :param layer: The layer to search on
+        :return: Whether the layer has a node with the given name
+        """
+        return self.get_node_with_name(name, layer) is not None
+
+    def get_subgraph_of_layers(self,
+                               layers: Set['GraphLayer'],
+                               edge_type_filter: Optional[Set[EdgeType]] = None,
+                               node_class_filter: Optional[Set[Type[ModelNode]]] = None) -> nx.Graph:
         graph = nx.Graph()
         nodes = self.get_nodes_at_layers(layers)
         edges = self.get_edges_at_layers(layers)
         for model_node in nodes:
             name = model_node.uid
+            if node_class_filter is not None:
+                filter_matches = False
+                for node_class in node_class_filter:
+                    if isinstance(model_node, node_class):
+                        filter_matches = True
+                        break
+                if not filter_matches:
+                    continue
             graph.add_node(name, **{MODEL_NODE: model_node})
         for edge in edges:
-            if edge_type_filter is not None and not edge.edge_type in edge_type_filter:
+            if edge_type_filter is not None and not edge.has_any_type(edge_type_filter):
+                continue
+            if not graph.has_node(edge.node_a.uid) or not graph.has_node(edge.node_b.uid):
                 continue
             graph.add_edge(edge.node_a.uid, edge.node_b.uid, **{MODEL_EDGE: edge})
         return graph
@@ -549,6 +641,21 @@ class MultiLayerGraph:
         with self._rlock:
             self.graph.remove_edge(edge.node_a.uid, edge.node_b.uid)
 
+    def node_degree(self,
+                    node: ModelNode,
+                    layers: Optional[Set['GraphLayer']] = None,
+                    layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.IS_SUB_LAYER) -> int:
+        neighbors = self.get_neighbors(node)
+        matching_neighbors = set(neighbors)
+        if layers is not None:
+            matching_neighbors = set()
+            for n in neighbors:
+                for layer in layers:
+                    if layer_matching_strategy.matches(layer, n.layer):
+                        matching_neighbors.add(n)
+                        break
+        return len(matching_neighbors)
+
     #
     # Graph Algorithms
     #
@@ -556,12 +663,14 @@ class MultiLayerGraph:
             start_node: Union[str, 'ModelNode'],
             max_depth: Optional[int] = None,
             stop_node_types: Optional[Set[Type['ModelNode']]] = None,
+            stop_node_callback: Optional[Callable[['ModelNode', 'ModelNode', int], bool]] = None,
             allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
             node_filter: Optional[Callable[[ModelNode], bool]] = None,
-            stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
-            allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
+            stop_edge_types: Optional[Set['EdgeType']] = None,
+            allowed_edge_types: Optional[Set['EdgeType']] = None,
             layers: Optional[Set['GraphLayer']] = None,
-            layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER
+            layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER,
+            yield_stop_nodes: bool = False
             ) -> Iterator[Tuple[ModelNode, Optional[ModelNode], int]]:
         """
         Performs a breadth-first-search on the graph starting at the given node.
@@ -578,24 +687,28 @@ class MultiLayerGraph:
             start_node=start_node,
             max_depth=max_depth,
             stop_node_types=stop_node_types,
+            stop_node_callback=stop_node_callback,
             allowed_node_types=allowed_node_types,
             node_filter=node_filter,
             stop_edge_types=stop_edge_types,
             allowed_edge_types=allowed_edge_types,
             layers=layers,
-            layer_matching_strategy=layer_matching_strategy
+            layer_matching_strategy=layer_matching_strategy,
+            yield_stop_nodes=yield_stop_nodes
         )
 
     def dfs(self,
             start_node: Union[str, 'ModelNode'],
             max_depth: Optional[int] = None,
             stop_node_types: Optional[Set[Type['ModelNode']]] = None,
+            stop_node_callback: Optional[Callable[['ModelNode', 'ModelNode', int], bool]] = None,
             allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
             node_filter: Optional[Callable[[ModelNode], bool]] = None,
-            stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
-            allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
+            stop_edge_types: Optional[Set['EdgeType']] = None,
+            allowed_edge_types: Optional[Set['EdgeType']] = None,
             layers: Optional[Set['GraphLayer']] = None,
-            layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER
+            layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER,
+            yield_stop_nodes: bool = False
             ) -> Iterator[Tuple[ModelNode, ModelNode, int]]:
         """
         Performs a depth-first-search on the graph starting at the given node.
@@ -609,12 +722,14 @@ class MultiLayerGraph:
             start_node=start_node,
             max_depth=max_depth,
             stop_node_types=stop_node_types,
+            stop_node_callback=stop_node_callback,
             allowed_node_types=allowed_node_types,
             node_filter=node_filter,
             stop_edge_types=stop_edge_types,
             allowed_edge_types=allowed_edge_types,
             layers=layers,
-            layer_matching_strategy=layer_matching_strategy
+            layer_matching_strategy=layer_matching_strategy,
+            yield_stop_nodes=yield_stop_nodes
         )
 
     def _stack_search(self,
@@ -622,25 +737,42 @@ class MultiLayerGraph:
                       start_node: Union[str, 'ModelNode'],
                       max_depth: Optional[int] = None,
                       stop_node_types: Optional[Set[Type['ModelNode']]] = None,
+                      stop_node_callback: Optional[Callable[['ModelNode', 'ModelNode', int], bool]] = None,
                       allowed_node_types: Optional[Set[Type['ModelNode']]] = None,
                       node_filter: Optional[Callable[[ModelNode], bool]] = None,
-                      stop_edge_types: Optional[Set[Type['EdgeType']]] = None,
-                      allowed_edge_types: Optional[Set[Type['EdgeType']]] = None,
+                      stop_edge_types: Optional[Set['EdgeType']] = None,
+                      allowed_edge_types: Optional[Set['EdgeType']] = None,
                       layers: Optional[Set['GraphLayer']] = None,
-                      layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER
+                      layer_matching_strategy: LayerMatchingStrategy = LayerMatchingStrategy.SHARED_TOP_LEVEL_LAYER,
+                      yield_stop_nodes: bool = False
                       ) -> Iterator[Tuple[ModelNode, ModelNode, int]]:
         start_node = self.get_model_node(start_node)
         seen = set()
         # Second tuple parameter indicates the node's depth
         stack: List[Tuple[ModelNode, int]] = [(start_node, 0)]
+        stop_nodes_to_yield: Set[ModelNode] = set()
         predecessors: Dict[ModelNode, ModelNode] = {}
+
+        def _is_stop_node(node, pred, d) -> bool:
+            if stop_node_types is not None:
+                if isinstance(node, tuple(stop_node_types)):
+                    return True
+            if stop_node_callback is not None:
+                return stop_node_callback(node, pred, d)
+            return False
+
         while len(stack) > 0:
+            model_node: ModelNode
             model_node, node_depth = stack.pop(pop_index_callback(stack))
             if model_node in seen:
                 continue
             seen.add(model_node)
-            predecessor = predecessors.get(model_node)
+            predecessor: ModelNode = predecessors.get(model_node)
             yield tuple([model_node, predecessor, node_depth])
+            if model_node in stop_nodes_to_yield:
+                # model_node is a stop node that should not be traversed further
+                continue
+
             if max_depth is not None and node_depth >= max_depth - 1:
                 # Maximum depth reached
                 continue
@@ -652,12 +784,20 @@ class MultiLayerGraph:
                     successor for successor in successors
                     if any([layer_matching_strategy.matches(successor.layer, layer) for layer in layers])
                 ]
-            if stop_node_types is not None:
-                # Exclude all successors that are an instance of a given stop_node_type
-                successors = [
-                    successor for successor in successors
-                    if not isinstance(successor, tuple(stop_node_types))
-                ]
+            if stop_node_types is not None or stop_node_callback is not None:
+                # Exclude all successors that are an instance of a given stop_node_type or match the stop_node_callback filter
+                if yield_stop_nodes:
+                    stop_nodes = [
+                        successor for successor in successors
+                        if _is_stop_node(successor, model_node, node_depth + 1)
+                    ]
+                    for stop_node in stop_nodes:
+                        stop_nodes_to_yield.add(stop_node)
+                else:
+                    successors = [
+                        successor for successor in successors
+                        if not _is_stop_node(successor, model_node, node_depth + 1)
+                    ]
             if allowed_node_types is not None:
                 # Exclude all successors that are not an instance of a given include_node_type
                 successors = [
@@ -673,13 +813,13 @@ class MultiLayerGraph:
                 # Exclude all nodes connected to by not-allowed edge types
                 successors = [
                     successor for successor in successors
-                    if self.get_edge(model_node, successor).edge_type not in stop_edge_types
+                    if not self.get_edge(model_node, successor).has_any_type(stop_edge_types)
                 ]
             if allowed_edge_types is not None:
                 # Only include nodes connected to by allowed edge types
                 successors = [
                     successor for successor in successors
-                    if self.get_edge(model_node, successor).edge_type in allowed_edge_types
+                    if self.get_edge(model_node, successor).has_any_type(allowed_edge_types)
                 ]
             # add predecessor
             for successor in successors:

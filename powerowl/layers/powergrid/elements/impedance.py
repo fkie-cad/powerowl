@@ -1,7 +1,6 @@
 from typing import List
 
 import numpy as np
-
 from powerowl.layers.powergrid.elements.attribute_specification import AttributeSpecification as As
 from powerowl.layers.powergrid.elements.grid_edge import GridEdge
 from powerowl.layers.powergrid.elements.grid_node import GridNode
@@ -24,11 +23,11 @@ class Impedance(GridEdge):
 
             As("from_bus", Gvc.PROPERTY, GridNode, None),
             As("to_bus", Gvc.PROPERTY, GridNode, None),
-            As("resistance_from_to", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
-            As("reactance_from_to", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
-            As("resistance_to_from", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
-            As("reactance_to_from", Gvc.PROPERTY, float, np.NAN, Unit.OHM, Scale.BASE),
-            As("apparent_power", Gvc.PROPERTY, float, np.NAN, Unit.VOLT_AMPERE, Scale.BASE),
+            As("resistance_from_to", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
+            As("reactance_from_to", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
+            As("resistance_to_from", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
+            As("reactance_to_from", Gvc.PROPERTY, float, np.nan, Unit.OHM, Scale.BASE),
+            As("apparent_power", Gvc.PROPERTY, float, np.nan, Unit.VOLT_AMPERE, Scale.BASE),
 
             As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 

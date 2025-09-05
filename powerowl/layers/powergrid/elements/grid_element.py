@@ -5,12 +5,11 @@ import warnings
 from typing import List, Type, TYPE_CHECKING, Tuple, Optional, Union, Dict
 
 from powerowl.exceptions.grid_value_error import GridValueError
+from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
-
 from powerowl.layers.powergrid.elements.attribute_specification import AttributeSpecification
 from powerowl.layers.powergrid.values.grid_value import GridValue
 from powerowl.layers.powergrid.values.grid_value_context import GridValueContext
-from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
 from powerowl.layers.powergrid.values.grid_value_type import Step
 
 if TYPE_CHECKING:

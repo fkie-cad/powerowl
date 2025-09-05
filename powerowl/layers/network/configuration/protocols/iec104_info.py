@@ -5,7 +5,6 @@ from powerowl.layers.network.configuration.protocols.protocol_info import Protoc
 from powerowl.layers.network.configuration.protocols.protocol_name import ProtocolName
 from powerowl.layers.powergrid.values.grid_value_type import Step
 
-
 if TYPE_CHECKING:
     from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
 
