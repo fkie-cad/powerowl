@@ -10,6 +10,7 @@ from ...graph.constants import MAC_CACHE
 
 if TYPE_CHECKING:
     from .interface import Interface
+    from .subnet import Subnet
 
 
 @dataclasses.dataclass(eq=False, kw_only=True)
@@ -39,7 +40,27 @@ class NetworkNode(NetworkEntity):
         interfaces = [cast(Interface, interface) for interface in interfaces]
         for i, interface in enumerate(interfaces):
             interface.local_id = f"i{i}"
+            interface.local_index = i
         return interfaces
+
+    def get_spare_interfaces(self) -> List['Interface']:
+        interfaces = []
+        for interface in self.get_interfaces():
+            if interface.get_configuration_key("spare", False):
+                interfaces.append(interface)
+        return interfaces
+
+    def has_spare_interface(self) -> bool:
+        return len(self.get_spare_interfaces()) > 0
+
+    def get_subnets(self) -> List['Subnet']:
+        subnets = []
+        for interface in self.get_interfaces():
+            subnet = interface.get_subnet()
+            if subnet is not None:
+                if subnet not in subnets:
+                    subnets.append(subnet)
+        return subnets
 
     def set_local_interface_ids(self):
         self.get_interfaces()

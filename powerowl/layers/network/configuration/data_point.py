@@ -5,7 +5,9 @@ from powerowl.graph.model_node import ModelNode
 from powerowl.layers.network.configuration.data_point_type import DataPointType
 from powerowl.layers.network.configuration.data_point_value import DataPointValue
 from powerowl.layers.network.configuration.protocols.protocol_info import ProtocolInfo
+from powerowl.layers.network.configuration.providers.power_grid_provider_info import PowerGridProviderInfo
 from powerowl.layers.network.configuration.providers.provider_info import ProviderInfo
+from powerowl.layers.powergrid.values.grid_value import GridValue
 from powerowl.layers.powergrid.values.grid_value_type import Step
 from powerowl.layers.powergrid.values.units.scale import Scale
 from powerowl.layers.powergrid.values.units.unit import Unit
@@ -22,13 +24,19 @@ class DataPoint(ModelNode):
     protocol: Optional[ProtocolInfo] = None
     providers: List[ProviderInfo] = field(default_factory=list)
     coupling: Optional[str] = None
-    related_points: List[str] = field(default_factory=list)
+    related_points: List['DataPoint'] = field(default_factory=list)
+
+    grid_values: List[GridValue] = field(default_factory=list)
+    server: ModelNode = None
 
     @property
     def data_point_id(self):
         if self._data_point_id is None and self.protocol is not None:
             return self.protocol.generate_data_point_id()
         return self._data_point_id
+
+    def get_identifier(self):
+        return self.data_point_id
 
     def to_data_point_dict(self, as_primitive: bool = False) -> dict:
         # Derive dictionary for source and target providers (domain)
@@ -49,10 +57,45 @@ class DataPoint(ModelNode):
             "scale": self.scale.name,
             "unit": self.unit.name,
             "coupling": self.coupling,
-            "related": [dp.data_point_id for dp in self.related_points]
+            "related": list(set([dp.data_point_id for dp in self.related_points if dp.data_point_id != self.data_point_id]))
         }
         # Add Protocol Information
         d.update(self.protocol.get_protocol_dict(as_primitive=as_primitive))
+        if self.server is not None:
+            d["protocol_server_id"] = self.server.uid
+        # Add PowerGrid Information if applicable
+        ## Direct grid values
+        direct_grid_value_identifiers = []
+        for provider in self.providers:
+            if isinstance(provider, PowerGridProviderInfo):
+                direct_grid_value_identifiers.append(f"{provider.element_id}.{provider.attribute_context}.{provider.attribute_name}")
+        ## Indirect
+        grid_value_via_map = {}
+        for related in set(self.related_points):
+            if related == self:
+                continue
+            for grid_value in related.grid_values:
+                grid_value_via_map[grid_value.get_identifier()] = {
+                    "device": related.name,
+                    "protocol": related.protocol.name.value,
+                }
+
+        ## Associated and direct ones
+        d["grid_value"] = False
+        if len(self.grid_values) > 0:
+            grid_value_descriptions = [{
+                "grid_element": grid_value.get_grid_element().get_identifier(),
+                "context": grid_value.value_context.name,
+                "attribute": grid_value.name,
+                "type": str(grid_value.value_type.__name__),
+                "direct": grid_value.get_identifier() in direct_grid_value_identifiers,
+                "via": grid_value_via_map.get(grid_value.get_identifier(), False)
+            } for grid_value in self.grid_values]
+            if len(grid_value_descriptions) == 1:
+                d["grid_value"] = grid_value_descriptions[0]
+            else:
+                d["grid_value"] = grid_value_descriptions
+
         # Delete empty keys that are optional
         for optional in ["description", "coupling"]:
             if d[optional] is None:

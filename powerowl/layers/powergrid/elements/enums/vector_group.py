@@ -7,3 +7,4 @@ class VectorGroup(enum.Enum):
     YYN = "Yyn"
     YZN = "Yzn"
     YNYN = "YNyn"
+    YND5 = "ynd5"

@@ -33,12 +33,12 @@ class VoltageNiveau(enum.Enum):
 
     def __lt__(self, other):
         if isinstance(other, VoltageNiveau):
-            return self.value < other.value
+            return self.as_value() < other.as_value()
         return False
 
     def __gt__(self, other):
         if isinstance(other, VoltageNiveau):
-            return self.value > other.value
+            return self.as_value() > other.as_value()
         return False
 
     def __eq__(self, other):
@@ -50,7 +50,7 @@ class VoltageNiveau(enum.Enum):
         return self.value != other.value
 
     def __le__(self, other):
-        return self.value <= other.value
+        return self.as_value() <= other.as_value()
 
     def __ge__(self, other):
-        return self.value >= other.value
+        return self.as_value() >= other.as_value()

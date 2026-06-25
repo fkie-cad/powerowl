@@ -1,0 +1,15 @@
+import enum
+
+
+class ModbusFunctionCode(int, enum.Enum):
+    READ_COIL = 1
+    WRITE_COIL = 5
+    WRITE_MULTIPLE_COILS = 15
+
+    READ_DISCRETE_INPUT = 2
+
+    READ_HOLDING_REGISTER = 3
+    WRITE_HOLDING_REGISTER = 6
+    WRITE_HOLDING_REGISTERS = 16
+
+    READ_INPUT_REGISTER = 4

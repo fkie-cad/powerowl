@@ -96,7 +96,7 @@ class PowerOwl:
         except Exception:
             raise KeyError(f"{key} is not of type list for context {context}")
 
-    def get_data(self, context, key = None, default_value=None):
+    def get_data(self, context, key=None, default_value=None):
         if key is None:
             return self._data.get(context, {})
         return self._data.get(context, {}).get(key, default_value)
@@ -170,6 +170,7 @@ class PowerOwl:
         iterate = True
         iteration = 0
         max_iterations = 10
+
         while iterate:
             use_stable_ids = self._config.get("use_stable_ids", True)
             iterate = False

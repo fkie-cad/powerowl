@@ -36,7 +36,7 @@ class Switch(GridAnnotator):
             As("in_service", Gvc.CONFIGURATION, bool, True, required=False, operator_controllable=False, simulation_context=False),
             As("closed", Gvc.CONFIGURATION, bool, True, related=[(Gvc.MEASUREMENT, "is_closed")]),
 
-            As("is_closed", Gvc.MEASUREMENT, bool, True, source=(Gvc.CONFIGURATION, "closed"), targets=[(Gvc.CONFIGURATION, "closed")])
+            As("is_closed", Gvc.MEASUREMENT, bool, True, source=(Gvc.CONFIGURATION, "closed"), targets=[(Gvc.CONFIGURATION, "closed")], estimatable=False)
         ]
 
     def et(self):

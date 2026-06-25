@@ -64,10 +64,11 @@ class Transformer(GridEdge):
             As("maximum_load", Gvc.PROPERTY, float, np.nan, unit=Unit.PERCENT,
                required=False, pp_column="max_loading_percent"),
 
-            As("tap_position", Gvc.CONFIGURATION, Step, 0, related=[(Gvc.MEASUREMENT, "tap_position")], targets=[(Gvc.MEASUREMENT, "tap_position")]),
+            As("tap_position", Gvc.CONFIGURATION, Step, 0, related=[(Gvc.MEASUREMENT, "tap_position")]),
             As("in_service", Gvc.CONFIGURATION, bool, True, operator_controllable=False),
 
-            As("tap_position", Gvc.MEASUREMENT, Step, 0, related=[(Gvc.CONFIGURATION, "tap_position")]),
+            As("tap_position", Gvc.MEASUREMENT, Step, 0, related=[(Gvc.CONFIGURATION, "tap_position")], source=(Gvc.CONFIGURATION, "tap_position"),
+               targets=[(Gvc.CONFIGURATION, "tap_position")], estimatable=False),
             As("active_power_hv", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE),
             As("reactive_power_hv", Gvc.MEASUREMENT, float, np.nan, Unit.VAR, Scale.BASE),
             As("active_power_lv", Gvc.MEASUREMENT, float, np.nan, Unit.WATT, Scale.BASE),

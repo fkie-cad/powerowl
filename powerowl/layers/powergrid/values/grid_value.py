@@ -208,6 +208,8 @@ class GridValue:
             return [GridValue._numpy_extract(entry) for entry in obj.tolist()]
         if isinstance(obj, np.bool_):
             return bool(obj)
+        if isinstance(obj, np.bool):
+            return bool(obj)
         return None
 
     def get_native_value(self) -> Any:

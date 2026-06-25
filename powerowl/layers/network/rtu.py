@@ -11,11 +11,12 @@ from powerowl.layers.network.configuration.protocols.iec61850.mms_data_set impor
 from powerowl.layers.network.configuration.protocols.iec61850.mms_report_control_block import MMSReportControlBlock
 from powerowl.layers.network.configuration.protocols.iec61850mms_info import IEC61850MMSInfo
 from powerowl.layers.network.configuration.protocols.protocol_name import ProtocolName
+from powerowl.layers.network.field_device import FieldDevice
 from powerowl.layers.network.host import Host
 
 
 @dataclasses.dataclass(eq=False, kw_only=True)
-class RTU(Host):
+class RTU(FieldDevice):
     def __post_init__(self):
         super().__post_init__()
         self._data_points: List[DataPoint] = []
@@ -50,7 +51,12 @@ class RTU(Host):
         return self._data_points
 
     def next_device_group(self):
-        self._ioa = self._start_ioa + self._group * self._ioa_group_size
+        current_ioa = self._ioa
+        next_ioa = self._ioa
+        while next_ioa <= current_ioa:
+            self._group += 1
+            next_ioa = self._start_ioa + self._group * self._ioa_group_size
+        self._ioa = next_ioa
 
     def add_104_data_point(self, data_point: DataPoint):
         if not isinstance(data_point.protocol, IEC104Info):

@@ -236,6 +236,7 @@ class MMSDataObject(ModelNode):
             # Add protocol information
             ied = root.get_server()
             root.is_primary_attribute = len(root.providers) > 0
+            root.server = ied
 
             try:
                 direction = root.functional_constraint.get_direction()

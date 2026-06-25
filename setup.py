@@ -27,11 +27,13 @@ setup(
         'pandas',
         'pydot',
         'plotly',
-        'igraph==0.9.9',
+        #'igraph==0.9.9',
+        'igraph',
         'pyyaml',
         'setuptools',
         'shapely',
-        'ifcfg'
+        'ifcfg',
+        'pyopenssl'
     ],
     python_requires=">=3.12.0",
     author="Lennart Bader (Fraunhofer FKIE)",

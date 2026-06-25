@@ -18,6 +18,7 @@ class Interface(NetworkEntity):
     ip_address: Optional[str] = None
     short_name: str = None
     local_id: str = None
+    local_index: int = -1
 
     def get_description_lines(self) -> List[str]:
         return [

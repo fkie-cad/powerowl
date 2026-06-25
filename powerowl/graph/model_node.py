@@ -260,5 +260,13 @@ class ModelNode:
     def set_configuration_key(self, key, value):
         self._attributes.setdefault("configuration", {})[key] = value
 
+    def unset_configuration_key(self, key):
+        if key in self._attributes.setdefault("configuration", {}):
+            del self._attributes["configuration"][key]
+
+    def set_configuration_key_default(self, key, value):
+        if key not in self._attributes.setdefault("configuration", {}):
+            self.set_configuration_key(key, value)
+
     def get_configuration_key(self, key, default=None):
         return self._attributes.setdefault("configuration", {}).get(key, default)

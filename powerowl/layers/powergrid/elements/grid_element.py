@@ -64,7 +64,7 @@ class GridElement(abc.ABC):
             if spec.required and value.value is None and sanitize_specification:
                 raise GridValueError(f"Required value {spec.name} missing for {self.get_identifier()}")
             self._attributes[spec.context][spec.name] = value
-            if spec.context == GridValueContext.MEASUREMENT:
+            if spec.context == GridValueContext.MEASUREMENT and spec.estimatable:
                 spec_est = spec.copy()
                 spec_est.context = GridValueContext.ESTIMATION
                 spec_est.targets = None
@@ -243,7 +243,7 @@ class GridElement(abc.ABC):
                     if issubclass(value.value_type, GridElement):
                         # Reference to another grid element
                         if attribute_value is None:
-                            warnings.warn(f"{context.value}.{attribute_name} is None, but should be {value.value_type.__name__}")
+                            warnings.warn(f"{self.get_identifier()}.{context.value}.{attribute_name} is None, but should be {value.value_type.__name__}")
                             value.set_value(None)
                         else:
                             element_type, element_id = attribute_value.split(".")

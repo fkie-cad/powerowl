@@ -2,7 +2,6 @@ import traceback
 import warnings
 from typing import Any, List, Union, Optional, Dict, Callable, Set, Tuple
 
-import igraph
 import networkx as nx
 from powerowl.graph.enums import Layers, EdgeType
 from powerowl.layers.powergrid.elements import Bus, Line, DcLine, Switch
@@ -143,6 +142,7 @@ class PowerGridModel:
         for element_type, elements in power_grid_dict["elements"].items():
             element_cls = GridElement.element_class_by_type(element_type)
             for element_id, element_primitive_dict in elements.items():
+                element_id = int(element_id)
                 element = element_cls(index=element_id)
                 self.elements.setdefault(element_type, {})[element_id] = element
                 primitive_dicts[element.get_identifier()] = element_primitive_dict
@@ -152,7 +152,7 @@ class PowerGridModel:
     def get_element(self, element_type: str, element_id: int) -> GridElement:
         return self.elements[element_type][element_id]
 
-    def get_elements(self):
+    def get_elements(self) -> List[GridElement]:
         elements = []
         for element_type in self.elements.keys():
             elements.extend(self.get_elements_by_type(element_type))
@@ -290,8 +290,7 @@ class PowerGridModel:
                     buses.append((other_bus, annotator.get_config_value("closed")))
         except Exception as e:
             warnings.warn(f"{traceback.format_exc()}")
-        finally:
-            return buses
+        return buses
 
     def get_bus(self, index) -> Bus:
         if isinstance(index, GridValue):
@@ -452,6 +451,7 @@ class PowerGridModel:
             if edge.get("type") != EdgeType.PHYSICAL_POWER:
                 g.remove_edge(e[0], e[1])
 
+        import igraph
         igraph_graph = igraph.Graph.from_networkx(g)
         igraph_graph.vs["name"] = igraph_graph.vs["_nx_name"]
 

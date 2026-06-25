@@ -24,6 +24,7 @@ class AttributeSpecification:
     operator_controllable: bool = True
     lower_bound: Optional[float] = None
     upper_bound: Optional[float] = None
+    estimatable: bool = True
 
     def copy(self):
         return dataclasses.replace(self)

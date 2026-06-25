@@ -190,8 +190,10 @@ class PandaPowerGridModel(PowerGridModel):
                             if scale != Scale.NONE and grid_value.scale != Scale.NONE:
                                 value = grid_value.scale.to_scale(value, scale)
                             self._set_pp_value(grid_value, table, index, column, value)
+                        except Exception as e:
+                            pass
                         finally:
-                            continue
+                            pass
         # Set "connected" values for assets
         for e_type, elements in self.elements.items():
             element: GridElement
@@ -397,7 +399,7 @@ class PandaPowerGridModel(PowerGridModel):
                         grid_element.get_config("scaling").freeze(0)
                 finally:
                     self.notify_simulation_configuration_changed()
-                    return True, new_value
+                return True, new_value
 
             if grid_value.name == "profile_enabled":
                 target_active_power = grid_element.get_config("target_active_power")
@@ -416,7 +418,7 @@ class PandaPowerGridModel(PowerGridModel):
                 target_active_power.set_value(target_active_power.get_value())
 
         # GENERATOR TARGET POWER
-        if isinstance(grid_element, (StaticGenerator, Storage, Load)):
+        if isinstance(grid_element, (StaticGenerator, Generator, Storage, Load)):
             if grid_value.name == "target_active_power_percentage":
                 # Update target_active_power based on percentage
                 max_power = grid_element.get_maximum_active_power()
@@ -958,6 +960,14 @@ class PandaPowerGridModel(PowerGridModel):
                 "lv": TapSide.LV,
                 "hv": TapSide.HV
             }.get(value, TapSide.NONE)
+        if element_type == "trafo" and column == "vector_group":
+            return {
+                "Dyn": VectorGroup.DYN,
+                "Yyn": VectorGroup.YYN,
+                "Yzn": VectorGroup.YZN,
+                "YNyn": VectorGroup.YNYN,
+                "ynd5": VectorGroup.YND5
+            }.get(value, VectorGroup.NONE)
         if element_type == "switch" and column == "type":
             return {
                 "ls": SwitchType.LOAD_SWITCH,
@@ -1041,6 +1051,8 @@ class PandaPowerGridModel(PowerGridModel):
 
     @staticmethod
     def _parse_storage_type(value):
+        if value is None:
+            return StorageType.BATTERY
         value = value.lower()
         extracted_type = StorageType.NONE
         if "pv" in value:
